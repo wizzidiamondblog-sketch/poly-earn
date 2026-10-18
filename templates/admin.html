@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Poly Earn - Admin Control Panel</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-950 text-white min-h-screen font-sans pb-12">
+
+    <!-- Top Navigation -->
+    <nav class="flex justify-between items-center px-6 py-4 border-b border-slate-800 bg-slate-900/60 backdrop-blur-md sticky top-0 z-50">
+        <h1 class="text-xl font-extrabold text-amber-400 tracking-wide flex items-center gap-2">
+            🛡️ Admin Control Panel
+        </h1>
+        <a href="/dashboard" class="text-xs bg-slate-800 text-gray-300 hover:bg-slate-700 px-3 py-2 rounded-xl border border-slate-700 font-semibold transition">Back to User Dashboard</a>
+    </nav>
+
+    <div class="max-w-4xl mx-auto px-4 mt-6 space-y-6">
+
+        <!-- STATS OVERVIEW -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="bg-slate-900/80 border border-slate-800 p-4 rounded-xl">
+                <p class="text-[10px] text-gray-400 uppercase font-semibold">Total Users</p>
+                <p class="text-2xl font-black text-emerald-400 mt-1">{{ total_users }}</p>
+            </div>
+            <div class="bg-slate-900/80 border border-slate-800 p-4 rounded-xl">
+                <p class="text-[10px] text-gray-400 uppercase font-semibold">Total Points Earned</p>
+                <p class="text-2xl font-black text-indigo-400 mt-1">{{ total_points_earned }} Pts</p>
+            </div>
+            <div class="bg-slate-900/80 border border-slate-800 p-4 rounded-xl">
+                <p class="text-[10px] text-gray-400 uppercase font-semibold">Pending Payouts</p>
+                <p class="text-2xl font-black text-amber-400 mt-1">{{ pending_payouts_count }}</p>
+            </div>
+            <div class="bg-slate-900/80 border border-slate-800 p-4 rounded-xl">
+                <p class="text-[10px] text-gray-400 uppercase font-semibold">Approved Payouts</p>
+                <p class="text-2xl font-black text-emerald-400 mt-1">${{ total_approved_usdt }} USDT</p>
+            </div>
+        </div>
+
+        <!-- PAYOUT MANAGEMENT TABLE -->
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+            <h2 class="text-base font-bold text-gray-100 flex items-center gap-2">
+                💳 Withdrawal Requests Management
+            </h2>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs text-gray-300">
+                    <thead class="bg-slate-950 text-gray-400 uppercase font-bold border-b border-slate-800 text-[10px]">
+                        <tr>
+                            <th class="p-3">User</th>
+                            <th class="p-3">USDT / Points</th>
+                            <th class="p-3">Polygon Wallet Address</th>
+                            <th class="p-3">Status</th>
+                            <th class="p-3">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-800/60">
+                        {% for p in payouts %}
+                        <tr class="hover:bg-slate-800/30">
+                            <td class="p-3 font-semibold text-white">@{{ p.username }}</td>
+                            <td class="p-3">
+                                <span class="text-emerald-400 font-bold">${{ p.usdt_amount }} USDT</span>
+                                <span class="text-[10px] text-gray-500 block">({{ p.points_deducted }} Pts)</span>
+                            </td>
+                            <td class="p-3 font-mono text-[11px] text-gray-300 select-all">{{ p.wallet_address }}</td>
+                            <td class="p-3">
+                                <span class="px-2.5 py-1 rounded-lg font-bold text-[10px] 
+                                    {% if p.status == 'Approved' %}bg-emerald-500/20 text-emerald-400
+                                    {% elif p.status == 'Declined' %}bg-rose-500/20 text-rose-400
+                                    {% else %}bg-amber-500/20 text-amber-400{% endif %}">
+                                    {{ p.status }}
+                                </span>
+                            </td>
+                            <td class="p-3">
+                                {% if p.status == 'Pending' %}
+                                <div class="flex gap-2">
+                                    <button onclick="updatePayout({{ p.id }}, 'Approved')" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-2.5 py-1 rounded-lg transition">Approve</button>
+                                    <button onclick="updatePayout({{ p.id }}, 'Declined')" class="bg-rose-600 hover:bg-rose-500 text-white font-bold px-2.5 py-1 rounded-lg transition">Decline</button>
+                                </div>
+                                {% else %}
+                                <span class="text-gray-500 text-[10px] italic">Completed</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" class="p-4 text-center text-gray-500">No withdrawal requests found.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ALL REGISTERED USERS TABLE -->
+        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+            <h2 class="text-base font-bold text-gray-100">👥 User Directory & Balances</h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs text-gray-300">
+                    <thead class="bg-slate-950 text-gray-400 uppercase font-bold border-b border-slate-800 text-[10px]">
+                        <tr>
+                            <th class="p-3">Username</th>
+                            <th class="p-3">Available Points</th>
+                            <th class="p-3">USDT Value</th>
+                            <th class="p-3">Ads Watched</th>
+                            <th class="p-3">Ref Code</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-800/60">
+                        {% for u in users %}
+                        <tr class="hover:bg-slate-800/30">
+                            <td class="p-3 font-bold text-white">@{{ u.username }}</td>
+                            <td class="p-3 text-emerald-400 font-bold">{{ u.points }} Pts</td>
+                            <td class="p-3 font-semibold text-white">${{ (u.points * 0.005) | round(2) }}</td>
+                            <td class="p-3">{{ u.ads_watched }} / 25</td>
+                            <td class="p-3 font-mono text-[10px] text-gray-400">{{ u.ref_code }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        function updatePayout(payoutId, status) {
+            if(!confirm(`Are you sure you want to mark this payout as ${status}?`)) return;
+
+            fetch('/admin/update-payout', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ payout_id: payoutId, status: status })
+            })
+            .then(res => res.json())
+            .then(data => {
+                alert(data.message);
+                if(data.success) location.reload();
+            });
+        }
+    </script>
+</body>
+</html>
