@@ -45,29 +45,36 @@
                 <span class="font-bold text-emerald-400"><span id="ads-watched">{{ user['ads_watched'] or 0 }}</span> / 25</span>
             </div>
 
-            <!-- Ad Container Box (Shows countdown at top during watch) -->
-            <div id="ad-box" class="hidden bg-slate-950 border-2 border-indigo-500/50 p-4 rounded-xl space-y-4 text-center">
-                <div class="bg-indigo-950/80 border border-indigo-500/60 p-3 rounded-lg flex items-center justify-between">
-                    <span class="text-xs font-bold text-indigo-300 tracking-wider uppercase">⏱️ COUNTDOWN REMAINING:</span>
-                    <span id="timer-text" class="text-xl font-mono font-bold text-amber-400 bg-slate-950 px-3 py-1 rounded border border-amber-500/40">60s</span>
-                </div>
+            <!-- Telegram-Style Native Ad Container -->
+            <div id="ad-box" class="hidden relative bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-4 text-center">
                 
-                <div class="bg-slate-900 p-4 rounded-lg border border-slate-800 space-y-2">
-                    <p class="text-sm font-semibold text-emerald-400 flex items-center justify-center gap-1">
-                        <span>📺</span> Sponsored Ad Opened in New Tab
-                    </p>
-                    <p class="text-xs text-slate-400">Return to this dashboard tab and stay here until countdown hits 0s to claim reward.</p>
+                <!-- Floating Pill Timer (Top pill) -->
+                <div class="flex justify-center">
+                    <span id="timer-text" class="bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 px-4 py-1 rounded-full text-xs font-mono font-bold tracking-wider shadow-sm">
+                        00:20
+                    </span>
+                </div>
+
+                <!-- Ad Banner Card -->
+                <div class="bg-slate-950 rounded-xl p-3 border border-slate-800 space-y-2">
+                    <div class="w-full h-36 bg-slate-800 rounded-lg flex items-center justify-center text-slate-500 text-xs font-semibold overflow-hidden">
+                        <span>📺 Monetag Direct Link Ad Active</span>
+                    </div>
+                    <div class="flex items-center justify-between text-xs text-slate-400 pt-1">
+                        <span class="bg-slate-800 px-2 py-0.5 rounded text-[10px]">ads by Monetag</span>
+                        <span class="text-emerald-400 font-medium">Click to get reward</span>
+                    </div>
                 </div>
             </div>
 
-            <!-- Main Watch Button -->
-            <button id="watch-btn" onclick="startWatchTask()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold p-3.5 rounded-xl text-sm transition shadow-lg shadow-indigo-600/30">
+            <!-- Start Watch Button -->
+            <button id="watch-btn" onclick="startWatchTask()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold p-4 rounded-xl text-base transition shadow-lg shadow-blue-600/30">
                 Start Watch Task (+2 Points)
             </button>
 
-            <!-- Claim Reward Button (Hidden by default, pops up when 60s countdown hits 0) -->
-            <button id="claim-btn" onclick="claimReward()" class="hidden w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold p-4 rounded-xl text-base transition shadow-lg shadow-emerald-500/40 animate-bounce">
-                🎁 Claim +2 Points Reward
+            <!-- Telegram-Style Blue "Continue / Claim" Button -->
+            <button id="claim-btn" onclick="claimReward()" class="hidden w-full bg-blue-500 hover:bg-blue-600 text-white font-extrabold p-4 rounded-xl text-base transition shadow-lg shadow-blue-500/30 animate-pulse">
+                Continue & Claim Reward
             </button>
         </div>
 
@@ -88,25 +95,22 @@
             // Open Monetag Direct Link in new tab
             window.open("https://uplcm.com/4/12063392", "_blank");
 
-            btn.disabled = true;
-            btn.innerText = "Task in Progress... (60s)";
+            btn.classList.add('hidden');
             claimBtn.classList.add('hidden');
             adBox.classList.remove('hidden');
 
-            let timeLeft = 60;
-            timerText.innerText = `${timeLeft}s`;
+            let timeLeft = 20; // Changed to 20 seconds!
+            timerText.innerText = `00:${timeLeft < 10 ? '0' + timeLeft : timeLeft}`;
 
             const countdownInterval = setInterval(() => {
                 timeLeft--;
                 if (timeLeft > 0) {
-                    timerText.innerText = `${timeLeft}s`;
-                    btn.innerText = `Task in Progress... (${timeLeft}s)`;
+                    timerText.innerText = `00:${timeLeft < 10 ? '0' + timeLeft : timeLeft}`;
                 } else {
                     clearInterval(countdownInterval);
                     
-                    // Hide countdown box and watch button, show bright Claim Reward button
+                    // Hide countdown ad box, show "Continue & Claim Reward" blue button
                     adBox.classList.add('hidden');
-                    btn.classList.add('hidden');
                     claimBtn.classList.remove('hidden');
                 }
             }, 1000);
@@ -117,7 +121,7 @@
             const btn = document.getElementById('watch-btn');
 
             claimBtn.disabled = true;
-            claimBtn.innerText = "Claiming Points...";
+            claimBtn.innerText = "Processing Reward...";
 
             // Send request to backend
             fetch('/watch_ad', {
@@ -136,25 +140,23 @@
                     setTimeout(() => {
                         claimBtn.classList.add('hidden');
                         claimBtn.disabled = false;
-                        claimBtn.innerText = "🎁 Claim +2 Points Reward";
+                        claimBtn.innerText = "Continue & Claim Reward";
 
                         btn.classList.remove('hidden');
-                        btn.disabled = false;
                         btn.innerText = "Start Watch Task (+2 Points)";
                     }, 2000);
                 } else {
                     alert('Error claiming points.');
                     claimBtn.disabled = false;
-                    claimBtn.innerText = "🎁 Claim +2 Points Reward";
+                    claimBtn.innerText = "Continue & Claim Reward";
                 }
             })
             .catch(err => {
                 console.error(err);
                 claimBtn.disabled = false;
-                claimBtn.innerText = "🎁 Claim +2 Points Reward";
+                claimBtn.innerText = "Continue & Claim Reward";
             });
         }
     </script>
 </body>
-    </html>
-    
+</html>
