@@ -1,8 +1,5 @@
 import os
-import random
-import string
 import sqlite3
-import requests
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -26,8 +23,7 @@ def init_db():
             last_name TEXT NOT NULL,
             email TEXT UNIQUE NOT NULL,
             password TEXT NOT NULL,
-            is_verified INTEGER DEFAULT 0,
-            verification_code TEXT,
+            is_verified INTEGER DEFAULT 1,
             balance REAL DEFAULT 0.0,
             is_admin INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -37,37 +33,6 @@ def init_db():
     conn.close()
 
 init_db()
-
-def send_verification_email(recipient_email, code):
-    resend_api_key = os.environ.get('RESEND_API_KEY')
-
-    if not resend_api_key:
-        print("RESEND_API_KEY not configured in environment variables.")
-        return False
-
-    try:
-        url = "https://api.resend.com/emails"
-        headers = {
-            "Authorization": f"Bearer {resend_api_key}",
-            "Content-Type": "application/json"
-        }
-        data = {
-            "from": "Poly Earn <onboarding@resend.dev>",
-            "to": [recipient_email],
-            "subject": "Poly Earn - Email Verification Code",
-            "html": f"<p>Hello,</p><p>Thank you for signing up on Poly Earn!</p><p>Your 6-digit email verification code is: <b>{code}</b></p><p>Best regards,<br>Poly Earn Team</p>"
-        }
-
-        response = requests.post(url, json=data, headers=headers, timeout=5)
-        if response.status_code == 200:
-            print(f"Verification email sent to {recipient_email}")
-            return True
-        else:
-            print(f"Resend Error: {response.text}")
-            return False
-    except Exception as e:
-        print(f"HTTP Error during email send: {e}")
-        return False
 
 @app.route('/')
 def home():
@@ -90,68 +55,30 @@ def register():
         conn = get_db()
         cursor = conn.cursor()
         
-        existing_user = cursor.execute('SELECT id, is_verified FROM users WHERE email = ?', (email,)).fetchone()
+        existing_user = cursor.execute('SELECT id FROM users WHERE email = ?', (email,)).fetchone()
         
-        code = ''.join(random.choices(string.digits, k=6))
-        hashed_password = generate_password_hash(password)
-
         if existing_user:
-            if existing_user['is_verified'] == 1:
-                conn.close()
-                flash('Email already registered and verified. Please login.', 'info')
-                return redirect(url_for('login'))
-            else:
-                cursor.execute('''
-                    UPDATE users SET first_name = ?, last_name = ?, password = ?, verification_code = ?
-                    WHERE email = ?
-                ''', (first_name, last_name, hashed_password, code, email))
-        else:
-            cursor.execute('''
-                INSERT INTO users (first_name, last_name, email, password, verification_code, is_verified)
-                VALUES (?, ?, ?, ?, ?, 0)
-            ''', (first_name, last_name, email, hashed_password, code))
+            conn.close()
+            flash('Email already registered. Please login.', 'info')
+            return redirect(url_for('login'))
 
+        hashed_password = generate_password_hash(password)
+        cursor.execute('''
+            INSERT INTO users (first_name, last_name, email, password, is_verified)
+            VALUES (?, ?, ?, ?, 1)
+        ''', (first_name, last_name, email, hashed_password))
+        
         conn.commit()
+        user_id = cursor.lastrowid
         conn.close()
 
-        send_verification_email(email, code)
-
-        session['pending_email'] = email
-        flash('Verification code sent to your email! Please check your inbox/spam.', 'success')
-        return redirect(url_for('verify'))
+        # Log user in straight
+        session['user_id'] = user_id
+        session['user_name'] = f"{first_name} {last_name}"
+        flash('Account created successfully! Welcome to Poly Earn.', 'success')
+        return redirect(url_for('dashboard'))
 
     return render_template('register.html')
-
-@app.route('/verify', methods=['GET', 'POST'])
-def verify():
-    email = session.get('pending_email')
-    if not email:
-        flash('No pending verification found. Please register first.', 'warning')
-        return redirect(url_for('register'))
-
-    if request.method == 'POST':
-        entered_code = request.form.get('code', '').strip()
-
-        conn = get_db()
-        cursor = conn.cursor()
-        user = cursor.execute('SELECT * FROM users WHERE email = ?', (email,)).fetchone()
-
-        if user and user['verification_code'] == entered_code:
-            cursor.execute('UPDATE users SET is_verified = 1, verification_code = NULL WHERE email = ?', (email,))
-            conn.commit()
-            conn.close()
-
-            session.pop('pending_email', None)
-            session['user_id'] = user['id']
-            session['user_name'] = f"{user['first_name']} {user['last_name']}"
-
-            flash('Account verified successfully! Welcome to Poly Earn.', 'success')
-            return redirect(url_for('dashboard'))
-        else:
-            conn.close()
-            flash('Invalid verification code. Please try again.', 'danger')
-
-    return render_template('verify.html', email=email)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -165,11 +92,6 @@ def login():
         conn.close()
 
         if user and check_password_hash(user['password'], password):
-            if user['is_verified'] == 0:
-                session['pending_email'] = email
-                flash('Please verify your email before logging in.', 'warning')
-                return redirect(url_for('verify'))
-
             session['user_id'] = user['id']
             session['user_name'] = f"{user['first_name']} {user['last_name']}"
             session['is_admin'] = user['is_admin']
@@ -205,52 +127,6 @@ def admin():
     conn.close()
 
     return render_template('admin.html', users=users)
-
-@app.route('/forgot_password', methods=['GET', 'POST'])
-def forgot_password():
-    if request.method == 'POST':
-        email = request.form.get('email', '').strip().lower()
-        conn = get_db()
-        cursor = conn.cursor()
-        user = cursor.execute('SELECT * FROM users WHERE email = ?', (email,)).fetchone()
-
-        if user:
-            code = ''.join(random.choices(string.digits, k=6))
-            cursor.execute('UPDATE users SET verification_code = ? WHERE email = ?', (code, email))
-            conn.commit()
-            send_verification_email(email, code)
-
-        conn.close()
-        session['pending_email'] = email
-        flash('If your email is registered, password reset code has been sent.', 'info')
-        return redirect(url_for('reset_password'))
-
-    return render_template('forgot_password.html')
-
-@app.route('/reset_password', methods=['GET', 'POST'])
-def reset_password():
-    email = session.get('pending_email')
-    if request.method == 'POST':
-        code = request.form.get('code', '').strip()
-        new_password = request.form.get('password', '')
-
-        conn = get_db()
-        cursor = conn.cursor()
-        user = cursor.execute('SELECT * FROM users WHERE email = ?', (email,)).fetchone()
-
-        if user and user['verification_code'] == code:
-            hashed_password = generate_password_hash(new_password)
-            cursor.execute('UPDATE users SET password = ?, verification_code = NULL WHERE email = ?', (hashed_password, email))
-            conn.commit()
-            conn.close()
-            session.pop('pending_email', None)
-            flash('Password reset successfully. Please login.', 'success')
-            return redirect(url_for('login'))
-        else:
-            conn.close()
-            flash('Invalid code or email.', 'danger')
-
-    return render_template('reset_password.html', email=email)
 
 @app.route('/logout')
 def logout():
