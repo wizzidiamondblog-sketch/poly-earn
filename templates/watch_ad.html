@@ -6,14 +6,14 @@
   <title>Poly Earn - Watch Ad</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-[#c8e6c9] text-slate-900 min-h-screen flex flex-col justify-between p-4 select-none relative">
+<body class="bg-[#0b0e14] text-white min-h-screen flex flex-col justify-between p-4 select-none relative">
 
   <!-- Top Bar: Back & Countdown Timer -->
   <div class="max-w-md w-full mx-auto flex justify-between items-center z-20">
-    <a href="/dashboard" class="w-10 h-10 bg-black/20 rounded-full flex items-center justify-center text-white font-bold text-lg hover:bg-black/30 transition">
+    <a href="/dashboard" class="w-10 h-10 bg-slate-800 border border-slate-700 rounded-full flex items-center justify-center text-white font-bold text-lg hover:bg-slate-700 transition">
       ✕
     </a>
-    <span class="text-sm font-black tracking-wider bg-black/30 text-white px-4 py-1.5 rounded-full backdrop-blur shadow-md" id="countdown-badge">
+    <span class="text-sm font-black tracking-wider bg-purple-600/20 border border-purple-500/40 text-purple-300 px-4 py-1.5 rounded-full backdrop-blur shadow-md" id="countdown-badge">
       00:20
     </span>
   </div>
@@ -21,16 +21,16 @@
   <!-- Ad Box & Content Container -->
   <div class="max-w-md w-full mx-auto my-auto space-y-4 z-10">
     
-    <!-- Live Monetag Ad iframe Container -->
-    <div class="bg-white rounded-3xl p-3 shadow-2xl border border-slate-200 space-y-2">
-      <div class="rounded-2xl overflow-hidden bg-slate-900 shadow-inner relative w-full h-64">
+    <!-- Live Monetag Ad iframe Container (Direct Display, No Mock Image) -->
+    <div class="bg-[#151922] border border-slate-800 rounded-3xl p-3 shadow-2xl space-y-2">
+      <div class="rounded-2xl overflow-hidden bg-slate-900 shadow-inner relative w-full h-80">
         <!-- Live Monetag Ad Frame -->
         <iframe src="https://uplcm.com/4/12063392" class="w-full h-full border-0" scrolling="auto"></iframe>
       </div>
 
-      <div class="flex justify-between items-center px-2">
-        <span class="text-[10px] text-slate-500 font-medium">ads by Monetag</span>
-        <span class="text-[10px] text-indigo-600 font-bold">Watch for 20s</span>
+      <div class="flex justify-between items-center px-2 py-1">
+        <span class="text-[10px] text-slate-400 font-medium">ads by Monetag</span>
+        <span class="text-[10px] text-emerald-400 font-bold">Watch for 20s</span>
       </div>
     </div>
 
@@ -39,7 +39,7 @@
       <div class="bg-[#1b4332] text-white p-3.5 rounded-2xl text-center shadow-lg border border-emerald-500/40 relative">
         <div class="absolute -top-2 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-[#1b4332] rotate-45 border-t border-l border-emerald-500/40"></div>
         <p class="font-bold text-sm flex items-center justify-center space-x-2">
-          <span>⬇️ Click the ad below to unlock reward!</span>
+          <span>⬇️ Click the ad above to unlock reward!</span>
         </p>
       </div>
     </div>
@@ -49,7 +49,7 @@
   <!-- Bottom Action Section -->
   <div class="max-w-md w-full mx-auto space-y-3 z-25 pb-2">
     <!-- Ad Link Button -->
-    <a id="ad-link-btn" href="https://uplcm.com/4/12063392" target="_blank" onclick="unlockReward()" class="block w-full py-4 bg-sky-500 hover:bg-sky-400 text-white text-center font-black rounded-2xl shadow-xl transition-all text-base tracking-wide pointer-events-none opacity-60">
+    <a id="ad-link-btn" href="https://uplcm.com/4/12063392" target="_blank" onclick="unlockReward()" class="block w-full py-4 bg-sky-500 text-slate-950 text-center font-black rounded-2xl shadow-xl transition-all text-base tracking-wide pointer-events-none opacity-60">
       Wait for timer...
     </a>
 
@@ -75,12 +75,14 @@
       if (timeLeft <= 0) {
         clearInterval(timer);
         countdownBadge.innerText = "00:00";
-        countdownBadge.classList.replace('bg-black/30', 'bg-emerald-600');
+        countdownBadge.classList.replace('bg-purple-600/20', 'bg-emerald-600/20');
+        countdownBadge.classList.replace('text-purple-300', 'text-emerald-400');
         
         // Enable Ad Link & Show Instruction
         adLinkBtn.classList.remove('pointer-events-none', 'opacity-60');
         adLinkBtn.classList.replace('bg-sky-500', 'bg-indigo-600');
-        adLinkBtn.innerText = "👉 Click This Ad Link To Continue";
+        adLinkBtn.classList.replace('text-slate-950', 'text-white');
+        adLinkBtn.innerText = "👉 Click Ad To Continue";
         
         instructionBox.classList.remove('hidden');
       }
