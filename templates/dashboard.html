@@ -59,34 +59,47 @@
         function startWatchTask() {
             const btn = document.getElementById('watch-btn');
             btn.disabled = true;
-            btn.innerText = "Watching Ad...";
+            
+            let timeLeft = 60; // 60 seconds countdown ad simulation
+            btn.innerText = `Watching Ad... (${timeLeft}s)`;
 
-            fetch('/watch_ad', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' }
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    document.getElementById('points').innerText = data.points;
-                    document.getElementById('ads-watched').innerText = data.ads_watched;
-                    document.getElementById('balance').innerText = data.balance;
-                    btn.innerText = "Success! +2 Points Added";
-                    setTimeout(() => {
+            const countdownInterval = setInterval(() => {
+                timeLeft--;
+                if (timeLeft > 0) {
+                    btn.innerText = `Watching Ad... (${timeLeft}s)`;
+                } else {
+                    clearInterval(countdownInterval);
+                    btn.innerText = "Crediting Points...";
+
+                    // Send request to backend after countdown finishes
+                    fetch('/watch_ad', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' }
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.success) {
+                            document.getElementById('points').innerText = data.points;
+                            document.getElementById('ads-watched').innerText = data.ads_watched;
+                            document.getElementById('balance').innerText = data.balance;
+                            btn.innerText = "Success! +2 Points Added 🎉";
+                            setTimeout(() => {
+                                btn.disabled = false;
+                                btn.innerText = "Start Watch Task (+2 Points)";
+                            }, 2000);
+                        } else {
+                            alert('Error adding points.');
+                            btn.disabled = false;
+                            btn.innerText = "Start Watch Task (+2 Points)";
+                        }
+                    })
+                    .catch(err => {
+                        console.error(err);
                         btn.disabled = false;
                         btn.innerText = "Start Watch Task (+2 Points)";
-                    }, 2000);
-                } else {
-                    alert('Error adding points.');
-                    btn.disabled = false;
-                    btn.innerText = "Start Watch Task (+2 Points)";
+                    });
                 }
-            })
-            .catch(err => {
-                console.error(err);
-                btn.disabled = false;
-                btn.innerText = "Start Watch Task (+2 Points)";
-            });
+            }, 1000);
         }
     </script>
 </body>
