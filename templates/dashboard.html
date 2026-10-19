@@ -39,10 +39,31 @@
                 <h3 class="font-bold text-white">Watch & Earn Tasks</h3>
                 <span class="text-xs bg-emerald-950 text-emerald-400 border border-emerald-800/50 px-2 py-1 rounded">+2 Points / Ad</span>
             </div>
+            
             <div class="bg-slate-950 border border-slate-800 p-3 rounded-lg flex items-center justify-between text-sm">
                 <span class="text-slate-400">Ads watched this window:</span>
                 <span class="font-bold text-emerald-400"><span id="ads-watched">{{ user['ads_watched'] or 0 }}</span> / 25</span>
             </div>
+
+            <!-- Ad Container Box (Hidden by default, displays when task starts) -->
+            <div id="ad-box" class="hidden bg-slate-950 border-2 border-indigo-500/50 p-3 rounded-xl space-y-3 text-center">
+                <div class="flex items-center justify-between text-xs text-indigo-300 font-semibold">
+                    <span>📺 SPONSORED ADVERTISEMENT</span>
+                    <span id="timer-text" class="bg-indigo-950 px-2 py-0.5 rounded border border-indigo-800 text-amber-400">60s</span>
+                </div>
+                
+                <!-- Ad Frame / Display Area -->
+                <div id="ad-content" class="w-full h-48 bg-slate-900 rounded-lg flex flex-col items-center justify-center border border-slate-800 p-2 overflow-hidden relative">
+                    <!-- Demo Video Player / Ad Placement -->
+                    <video autoplay loop muted class="w-full h-full object-cover rounded">
+                        <source src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4" type="video/mp4">
+                        Your browser does not support video.
+                    </video>
+                    <!-- If you have Adsterra / Monetag / PropellerAds script code, paste it inside here -->
+                </div>
+                <p class="text-xs text-slate-400">Keep page active until countdown finishes to receive reward.</p>
+            </div>
+
             <button id="watch-btn" onclick="startWatchTask()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold p-3.5 rounded-xl text-sm transition shadow-lg shadow-indigo-600/30">
                 Start Watch Task (+2 Points)
             </button>
@@ -58,15 +79,20 @@
     <script>
         function startWatchTask() {
             const btn = document.getElementById('watch-btn');
+            const adBox = document.getElementById('ad-box');
+            const timerText = document.getElementById('timer-text');
+
             btn.disabled = true;
-            
-            let timeLeft = 60; // 60 seconds countdown ad simulation
-            btn.innerText = `Watching Ad... (${timeLeft}s)`;
+            btn.innerText = "Watching Ad... Please wait";
+            adBox.classList.remove('hidden'); // Show the Ad video box
+
+            let timeLeft = 60; // 60 Seconds Timer
+            timerText.innerText = `${timeLeft}s`;
 
             const countdownInterval = setInterval(() => {
                 timeLeft--;
                 if (timeLeft > 0) {
-                    btn.innerText = `Watching Ad... (${timeLeft}s)`;
+                    timerText.innerText = `${timeLeft}s`;
                 } else {
                     clearInterval(countdownInterval);
                     btn.innerText = "Crediting Points...";
@@ -83,20 +109,24 @@
                             document.getElementById('ads-watched').innerText = data.ads_watched;
                             document.getElementById('balance').innerText = data.balance;
                             btn.innerText = "Success! +2 Points Added 🎉";
+                            adBox.classList.add('hidden'); // Hide Ad box
+
                             setTimeout(() => {
                                 btn.disabled = false;
                                 btn.innerText = "Start Watch Task (+2 Points)";
-                            }, 2000);
+                            }, 2500);
                         } else {
                             alert('Error adding points.');
                             btn.disabled = false;
                             btn.innerText = "Start Watch Task (+2 Points)";
+                            adBox.classList.add('hidden');
                         }
                     })
                     .catch(err => {
                         console.error(err);
                         btn.disabled = false;
                         btn.innerText = "Start Watch Task (+2 Points)";
+                        adBox.classList.add('hidden');
                     });
                 }
             }, 1000);
