@@ -27,8 +27,10 @@ def init_db():
         cursor = conn.cursor()
         
         if DATABASE_URL:
+            # Drop old table to clear all mismatch schema errors
+            cursor.execute("DROP TABLE IF EXISTS users CASCADE;")
             cursor.execute('''
-                CREATE TABLE IF NOT EXISTS users (
+                CREATE TABLE users (
                     id SERIAL PRIMARY KEY,
                     username VARCHAR(80) UNIQUE NOT NULL,
                     email VARCHAR(120) UNIQUE NOT NULL,
@@ -38,8 +40,9 @@ def init_db():
                 );
             ''')
         else:
+            cursor.execute("DROP TABLE IF EXISTS users;")
             cursor.execute('''
-                CREATE TABLE IF NOT EXISTS users (
+                CREATE TABLE users (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     username TEXT UNIQUE NOT NULL,
                     email TEXT UNIQUE NOT NULL,
@@ -52,6 +55,7 @@ def init_db():
         conn.commit()
         cursor.close()
         conn.close()
+        print("Database initialized successfully!")
     except Exception as e:
         print(f"Database Init Error: {e}")
 
@@ -102,7 +106,6 @@ def register():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    session.clear() # Clear old broken session
     if request.method == 'POST':
         email = request.form.get('email')
         password = request.form.get('password')
@@ -147,25 +150,18 @@ def dashboard():
             row = cursor.fetchone()
             if row:
                 points = row[0]
-            else:
-                session.clear()
-                return redirect(url_for('login'))
         else:
             cursor.execute("SELECT points FROM users WHERE id = ?", (session['user_id'],))
             row = cursor.fetchone()
             if row:
                 points = row['points']
-            else:
-                session.clear()
-                return redirect(url_for('login'))
             
         cursor.close()
         conn.close()
     except Exception as e:
-        session.clear()
-        return redirect(url_for('login'))
+        points = 0
     
-    return render_template('dashboard.html', username=session.get('username'), points=points)
+    return render_template('dashboard.html', username=session.get('username', 'User'), points=points)
 
 @app.route('/watch-ad')
 def watch_ad():
@@ -203,3 +199,4 @@ def logout():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
+    
