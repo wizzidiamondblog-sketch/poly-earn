@@ -221,21 +221,12 @@ def watch_ad():
     except Exception as e:
         pass
         
-    # Store exact start time for timer security validation
-    session['ad_start_time'] = datetime.now().timestamp()
     return render_template('watch_ad.html')
 
 @app.route('/claim-reward', methods=['POST'])
 def claim_reward():
     if 'user_id' not in session:
         return redirect(url_for('login'))
-        
-    start_time = session.get('ad_start_time')
-    
-    # Verify at least 18 seconds passed on server clock before crediting
-    if not start_time or (datetime.now().timestamp() - start_time) < 18:
-        flash("Failed to claim reward. Please wait the full 20 seconds.", "error")
-        return redirect(url_for('dashboard'))
         
     try:
         conn = get_db()
@@ -256,9 +247,6 @@ def claim_reward():
         conn.commit()
         cursor.close()
         conn.close()
-        
-        # Clear start timestamp so it can't be re-submitted
-        session.pop('ad_start_time', None)
         
         flash("🎉 +3 Poly Points added to your balance!", "success")
     except Exception as e:
@@ -301,4 +289,4 @@ def logout():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
-            
+                           
