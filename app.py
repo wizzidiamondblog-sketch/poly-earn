@@ -102,6 +102,7 @@ def register():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    session.clear() # Clear old broken session
     if request.method == 'POST':
         email = request.form.get('email')
         password = request.form.get('password')
@@ -144,16 +145,25 @@ def dashboard():
         if DATABASE_URL:
             cursor.execute("SELECT points FROM users WHERE id = %s", (session['user_id'],))
             row = cursor.fetchone()
-            points = row[0] if row else 0
+            if row:
+                points = row[0]
+            else:
+                session.clear()
+                return redirect(url_for('login'))
         else:
             cursor.execute("SELECT points FROM users WHERE id = ?", (session['user_id'],))
             row = cursor.fetchone()
-            points = row['points'] if row else 0
+            if row:
+                points = row['points']
+            else:
+                session.clear()
+                return redirect(url_for('login'))
             
         cursor.close()
         conn.close()
     except Exception as e:
-        print(f"Dashboard Error: {e}")
+        session.clear()
+        return redirect(url_for('login'))
     
     return render_template('dashboard.html', username=session.get('username'), points=points)
 
