@@ -45,21 +45,29 @@
                 <span class="font-bold text-emerald-400"><span id="ads-watched">{{ user['ads_watched'] or 0 }}</span> / 25</span>
             </div>
 
-            <!-- Ad Container Box -->
-            <div id="ad-box" class="hidden bg-slate-950 border-2 border-indigo-500/50 p-4 rounded-xl space-y-3 text-center">
-                <div class="flex items-center justify-between text-xs text-indigo-300 font-semibold">
-                    <span>📺 SPONSORED ADVERTISEMENT</span>
-                    <span id="timer-text" class="bg-indigo-950 px-2.5 py-1 rounded border border-indigo-800 text-amber-400 font-mono text-sm">60s</span>
+            <!-- Ad Container Box (Shows countdown at top during watch) -->
+            <div id="ad-box" class="hidden bg-slate-950 border-2 border-indigo-500/50 p-4 rounded-xl space-y-4 text-center">
+                <div class="bg-indigo-950/80 border border-indigo-500/60 p-3 rounded-lg flex items-center justify-between">
+                    <span class="text-xs font-bold text-indigo-300 tracking-wider uppercase">⏱️ COUNTDOWN REMAINING:</span>
+                    <span id="timer-text" class="text-xl font-mono font-bold text-amber-400 bg-slate-950 px-3 py-1 rounded border border-amber-500/40">60s</span>
                 </div>
                 
                 <div class="bg-slate-900 p-4 rounded-lg border border-slate-800 space-y-2">
-                    <p class="text-sm font-medium text-emerald-400">Ad opened in new tab!</p>
-                    <p class="text-xs text-slate-400">Return to this tab and wait for the 60-second timer to claim your +2 points.</p>
+                    <p class="text-sm font-semibold text-emerald-400 flex items-center justify-center gap-1">
+                        <span>📺</span> Sponsored Ad Opened in New Tab
+                    </p>
+                    <p class="text-xs text-slate-400">Return to this dashboard tab and stay here until countdown hits 0s to claim reward.</p>
                 </div>
             </div>
 
+            <!-- Main Watch Button -->
             <button id="watch-btn" onclick="startWatchTask()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold p-3.5 rounded-xl text-sm transition shadow-lg shadow-indigo-600/30">
                 Start Watch Task (+2 Points)
+            </button>
+
+            <!-- Claim Reward Button (Hidden by default, pops up when 60s countdown hits 0) -->
+            <button id="claim-btn" onclick="claimReward()" class="hidden w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold p-4 rounded-xl text-base transition shadow-lg shadow-emerald-500/40 animate-bounce">
+                🎁 Claim +2 Points Reward
             </button>
         </div>
 
@@ -73,14 +81,16 @@
     <script>
         function startWatchTask() {
             const btn = document.getElementById('watch-btn');
+            const claimBtn = document.getElementById('claim-btn');
             const adBox = document.getElementById('ad-box');
             const timerText = document.getElementById('timer-text');
 
-            // 1. Open Monetag Direct Link full screen in a new tab
+            // Open Monetag Direct Link in new tab
             window.open("https://uplcm.com/4/12063392", "_blank");
 
             btn.disabled = true;
             btn.innerText = "Task in Progress... (60s)";
+            claimBtn.classList.add('hidden');
             adBox.classList.remove('hidden');
 
             let timeLeft = 60;
@@ -93,42 +103,58 @@
                     btn.innerText = `Task in Progress... (${timeLeft}s)`;
                 } else {
                     clearInterval(countdownInterval);
-                    btn.innerText = "Crediting Points...";
-
-                    // Send request to backend
-                    fetch('/watch_ad', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' }
-                    })
-                    .then(res => res.json())
-                    .then(data => {
-                        if (data.success) {
-                            document.getElementById('points').innerText = data.points;
-                            document.getElementById('ads-watched').innerText = data.ads_watched;
-                            document.getElementById('balance').innerText = data.balance;
-                            btn.innerText = "Success! +2 Points Added 🎉";
-                            adBox.classList.add('hidden');
-
-                            setTimeout(() => {
-                                btn.disabled = false;
-                                btn.innerText = "Start Watch Task (+2 Points)";
-                            }, 2500);
-                        } else {
-                            alert('Error adding points.');
-                            btn.disabled = false;
-                            btn.innerText = "Start Watch Task (+2 Points)";
-                            adBox.classList.add('hidden');
-                        }
-                    })
-                    .catch(err => {
-                        console.error(err);
-                        btn.disabled = false;
-                        btn.innerText = "Start Watch Task (+2 Points)";
-                        adBox.classList.add('hidden');
-                    });
+                    
+                    // Hide countdown box and watch button, show bright Claim Reward button
+                    adBox.classList.add('hidden');
+                    btn.classList.add('hidden');
+                    claimBtn.classList.remove('hidden');
                 }
             }, 1000);
         }
+
+        function claimReward() {
+            const claimBtn = document.getElementById('claim-btn');
+            const btn = document.getElementById('watch-btn');
+
+            claimBtn.disabled = true;
+            claimBtn.innerText = "Claiming Points...";
+
+            // Send request to backend
+            fetch('/watch_ad', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('points').innerText = data.points;
+                    document.getElementById('ads-watched').innerText = data.ads_watched;
+                    document.getElementById('balance').innerText = data.balance;
+                    
+                    claimBtn.innerText = "Success! +2 Points Claimed 🎉";
+
+                    setTimeout(() => {
+                        claimBtn.classList.add('hidden');
+                        claimBtn.disabled = false;
+                        claimBtn.innerText = "🎁 Claim +2 Points Reward";
+
+                        btn.classList.remove('hidden');
+                        btn.disabled = false;
+                        btn.innerText = "Start Watch Task (+2 Points)";
+                    }, 2000);
+                } else {
+                    alert('Error claiming points.');
+                    claimBtn.disabled = false;
+                    claimBtn.innerText = "🎁 Claim +2 Points Reward";
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                claimBtn.disabled = false;
+                claimBtn.innerText = "🎁 Claim +2 Points Reward";
+            });
+        }
     </script>
 </body>
-</html>
+    </html>
+    
