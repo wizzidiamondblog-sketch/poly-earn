@@ -1,162 +1,53 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Poly Earn - Dashboard</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Poly Earn - Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-slate-950 text-white min-h-screen p-4 flex flex-col justify-between">
-    <div class="max-w-md mx-auto w-full space-y-6">
-        <!-- Header -->
-        <div class="flex items-center justify-between">
-            <h1 class="text-2xl font-bold text-emerald-400 flex items-center gap-2">⚡ Poly Earn</h1>
-            <a href="/logout" class="bg-rose-950/50 text-rose-300 border border-rose-800/50 px-4 py-1.5 rounded-lg text-sm font-medium">Logout</a>
-        </div>
+<body class="bg-slate-950 text-white min-h-screen p-6 flex flex-col justify-between">
 
-        <!-- Stats Cards -->
-        <div class="grid grid-cols-2 gap-4">
-            <div class="bg-slate-900/80 border border-slate-800 p-4 rounded-xl">
-                <p class="text-xs text-slate-400 font-semibold tracking-wide uppercase">USDT VALUE</p>
-                <p class="text-2xl font-bold text-white mt-1">$<span id="balance">{{ user['balance'] or '0.00' }}</span></p>
-            </div>
-            <div class="bg-slate-900/80 border border-slate-800 p-4 rounded-xl">
-                <p class="text-xs text-slate-400 font-semibold tracking-wide uppercase">REDEEMED POINTS</p>
-                <p class="text-2xl font-bold text-amber-400 mt-1"><span id="points">{{ user['points'] or 0 }}</span> <span class="text-sm font-normal">Pts</span></p>
-            </div>
-        </div>
-
-        <!-- Redeem Section -->
-        <div class="bg-slate-900/80 border border-slate-800 p-4 rounded-xl space-y-3">
-            <p class="text-sm font-medium text-slate-300">Redeem Points to Polygon USDT</p>
-            <input type="text" placeholder="Paste Polygon USDT Address (0x...)" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-sm focus:outline-none focus:border-emerald-500 font-mono text-slate-300">
-            <button class="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold p-3 rounded-lg text-sm transition">Redeem Payout (Min Pts)</button>
-        </div>
-
-        <!-- Watch Tasks -->
-        <div class="bg-slate-900/80 border border-slate-800 p-4 rounded-xl space-y-4">
-            <div class="flex items-center justify-between">
-                <h3 class="font-bold text-white">Watch & Earn Tasks</h3>
-                <span class="text-xs bg-emerald-950 text-emerald-400 border border-emerald-800/50 px-2 py-1 rounded">+2 Points / Ad</span>
-            </div>
-            
-            <div class="bg-slate-950 border border-slate-800 p-3 rounded-lg flex items-center justify-between text-sm">
-                <span class="text-slate-400">Ads watched this window:</span>
-                <span class="font-bold text-emerald-400"><span id="ads-watched">{{ user['ads_watched'] or 0 }}</span> / 25</span>
-            </div>
-
-            <!-- Telegram-Style Native Ad Container -->
-            <div id="ad-box" class="hidden relative bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-4 text-center">
-                
-                <!-- Floating Pill Timer (Top pill) -->
-                <div class="flex justify-center">
-                    <span id="timer-text" class="bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 px-4 py-1 rounded-full text-xs font-mono font-bold tracking-wider shadow-sm">
-                        00:20
-                    </span>
-                </div>
-
-                <!-- Ad Banner Card -->
-                <div class="bg-slate-950 rounded-xl p-3 border border-slate-800 space-y-2">
-                    <div class="w-full h-36 bg-slate-800 rounded-lg flex items-center justify-center text-slate-500 text-xs font-semibold overflow-hidden">
-                        <span>📺 Monetag Direct Link Ad Active</span>
-                    </div>
-                    <div class="flex items-center justify-between text-xs text-slate-400 pt-1">
-                        <span class="bg-slate-800 px-2 py-0.5 rounded text-[10px]">ads by Monetag</span>
-                        <span class="text-emerald-400 font-medium">Click to get reward</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Start Watch Button -->
-            <button id="watch-btn" onclick="startWatchTask()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold p-4 rounded-xl text-base transition shadow-lg shadow-blue-600/30">
-                Start Watch Task (+2 Points)
-            </button>
-
-            <!-- Telegram-Style Blue "Continue / Claim" Button -->
-            <button id="claim-btn" onclick="claimReward()" class="hidden w-full bg-blue-500 hover:bg-blue-600 text-white font-extrabold p-4 rounded-xl text-base transition shadow-lg shadow-blue-500/30 animate-pulse">
-                Continue & Claim Reward
-            </button>
-        </div>
-
-        <!-- Invite -->
-        <div class="bg-slate-900/80 border border-slate-800 p-4 rounded-xl space-y-2">
-            <h3 class="font-bold text-white">Invite & Earn</h3>
-            <p class="text-xs text-slate-400">Earn +10 points instantly when your friends join through your link!</p>
-        </div>
+  <div class="max-w-md w-full mx-auto space-y-6">
+    
+    <!-- Header -->
+    <div class="flex justify-between items-center bg-slate-900 border border-slate-800 p-4 rounded-2xl">
+      <div>
+        <h1 class="text-xl font-bold text-indigo-400">Welcome, {{ username }}!</h1>
+        <p class="text-xs text-slate-400">Poly Earn Dashboard</p>
+      </div>
+      <a href="/logout" class="px-3 py-1.5 bg-rose-500/10 text-rose-400 border border-rose-500/30 rounded-xl text-xs font-semibold hover:bg-rose-500/20 transition-all">Logout</a>
     </div>
 
-    <script>
-        function startWatchTask() {
-            const btn = document.getElementById('watch-btn');
-            const claimBtn = document.getElementById('claim-btn');
-            const adBox = document.getElementById('ad-box');
-            const timerText = document.getElementById('timer-text');
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="p-3 rounded-xl text-center text-sm font-semibold border {% if category == 'error' %}bg-rose-500/10 border-rose-500/30 text-rose-400{% else %}bg-emerald-500/10 border-emerald-500/30 text-emerald-400{% endif %}">
+            {{ message }}
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
 
-            // Open Monetag Direct Link in new tab
-            window.open("https://uplcm.com/4/12063392", "_blank");
+    <!-- Points Card -->
+    <div class="bg-gradient-to-br from-indigo-900/40 to-slate-900 border border-indigo-500/30 rounded-3xl p-6 text-center shadow-xl space-y-2">
+      <p class="text-xs font-semibold uppercase tracking-wider text-indigo-300">Your Total Points</p>
+      <h2 class="text-5xl font-black text-white tracking-tight">{{ points }}</h2>
+    </div>
 
-            btn.classList.add('hidden');
-            claimBtn.classList.add('hidden');
-            adBox.classList.remove('hidden');
+    <!-- Actions / Watch Ad Section -->
+    <div class="space-y-3">
+      <a href="/watch-ad" class="block w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-center font-bold rounded-2xl text-white transition-all shadow-lg shadow-emerald-600/30">
+        Watch Ad & Earn (+10 Points)
+      </a>
+    </div>
 
-            let timeLeft = 20; // Changed to 20 seconds!
-            timerText.innerText = `00:${timeLeft < 10 ? '0' + timeLeft : timeLeft}`;
+  </div>
 
-            const countdownInterval = setInterval(() => {
-                timeLeft--;
-                if (timeLeft > 0) {
-                    timerText.innerText = `00:${timeLeft < 10 ? '0' + timeLeft : timeLeft}`;
-                } else {
-                    clearInterval(countdownInterval);
-                    
-                    // Hide countdown ad box, show "Continue & Claim Reward" blue button
-                    adBox.classList.add('hidden');
-                    claimBtn.classList.remove('hidden');
-                }
-            }, 1000);
-        }
+  <div class="text-center text-xs text-slate-600 pb-2">
+    Poly Earn &copy; 2026. All rights reserved.
+  </div>
 
-        function claimReward() {
-            const claimBtn = document.getElementById('claim-btn');
-            const btn = document.getElementById('watch-btn');
-
-            claimBtn.disabled = true;
-            claimBtn.innerText = "Processing Reward...";
-
-            // Send request to backend
-            fetch('/watch_ad', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' }
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    document.getElementById('points').innerText = data.points;
-                    document.getElementById('ads-watched').innerText = data.ads_watched;
-                    document.getElementById('balance').innerText = data.balance;
-                    
-                    claimBtn.innerText = "Success! +2 Points Claimed 🎉";
-
-                    setTimeout(() => {
-                        claimBtn.classList.add('hidden');
-                        claimBtn.disabled = false;
-                        claimBtn.innerText = "Continue & Claim Reward";
-
-                        btn.classList.remove('hidden');
-                        btn.innerText = "Start Watch Task (+2 Points)";
-                    }, 2000);
-                } else {
-                    alert('Error claiming points.');
-                    claimBtn.disabled = false;
-                    claimBtn.innerText = "Continue & Claim Reward";
-                }
-            })
-            .catch(err => {
-                console.error(err);
-                claimBtn.disabled = false;
-                claimBtn.innerText = "Continue & Claim Reward";
-            });
-        }
-    </script>
 </body>
 </html>
