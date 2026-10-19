@@ -2,75 +2,52 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Poly Earn - Watch Ad</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-[#0b0e14] text-white min-h-screen flex flex-col justify-between p-6 select-none">
+<body class="bg-[#0b0e14] text-white min-h-screen flex flex-col overflow-hidden select-none">
 
-  <!-- Top Bar: Back & Timer -->
-  <div class="max-w-md w-full mx-auto flex justify-between items-center">
-    <a href="/dashboard" class="w-10 h-10 bg-slate-800 border border-slate-700 rounded-full flex items-center justify-center text-white font-bold text-lg hover:bg-slate-700 transition">
+  <!-- Floating Fixed Top Header: Back Button & Live Timer -->
+  <div class="h-[60px] bg-[#151922] border-b border-slate-800 px-4 flex items-center justify-between shadow-xl z-50">
+    <a href="/dashboard" class="w-9 h-9 bg-slate-800 border border-slate-700 rounded-full flex items-center justify-center text-white font-bold text-sm hover:bg-slate-700 transition">
       ✕
     </a>
-    <span class="text-sm font-black tracking-wider bg-purple-600/20 border border-purple-500/40 text-purple-300 px-4 py-1.5 rounded-full backdrop-blur shadow-md" id="countdown-badge">
-      00:20
-    </span>
+
+    <!-- Active Timer Badge -->
+    <div id="timer-badge-container" class="flex items-center space-x-2 bg-purple-600/20 border border-purple-500/40 px-3.5 py-1.5 rounded-full">
+      <span class="w-2.5 h-2.5 bg-amber-400 rounded-full animate-ping"></span>
+      <span class="text-xs font-bold text-slate-300">Reward in:</span>
+      <span class="text-sm font-black text-amber-400 tracking-wider" id="countdown">20s</span>
+    </div>
+
+    <!-- Claim Button Container (Hidden until 20s reaches 0s) -->
+    <form id="claim-form" action="/claim-reward" method="POST" class="hidden">
+      <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs rounded-xl shadow-lg transition-all animate-bounce">
+        Claim +100 Points 🎉
+      </button>
+    </form>
   </div>
 
-  <!-- Main Timer Card -->
-  <div class="max-w-md w-full mx-auto bg-[#151922] border border-slate-800 rounded-3xl p-6 text-center space-y-6 shadow-2xl my-auto">
-    
-    <div class="w-20 h-20 bg-gradient-to-tr from-purple-600 to-indigo-500 rounded-3xl flex items-center justify-center mx-auto text-white text-3xl shadow-lg shadow-purple-600/30 animate-pulse">
-      ⚡
-    </div>
-
-    <div class="space-y-2">
-      <h2 id="status-heading" class="text-xl font-black text-white">Ad In Progress...</h2>
-      <p id="status-text" class="text-xs text-slate-400">Please wait 20 seconds to receive your +100 Poly Points reward!</p>
-    </div>
-
-    <!-- Live Countdown Display -->
-    <div id="timer-box" class="py-2">
-      <div class="text-5xl font-black text-amber-400 tracking-wider" id="countdown">20</div>
-      <p class="text-xs text-slate-500 mt-2">Seconds remaining...</p>
-    </div>
-
-    <!-- Claim Reward Form (Hidden until timer finishes) -->
-    <div class="space-y-3">
-      <form id="claim-form" action="/claim-reward" method="POST" class="hidden">
-        <button type="submit" class="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold rounded-2xl shadow-xl transition-all text-sm tracking-wide flex items-center justify-center space-x-2">
-          <span>Claim +100 Poly Points 🎉</span>
-        </button>
-      </form>
-    </div>
-
-  </div>
-
-  <div class="max-w-md w-full mx-auto text-center text-xs text-slate-600 pb-2">
-    Poly Earn &copy; 2026. Secure Crypto Payouts.
+  <!-- Full Screen Live Ad Container -->
+  <div class="w-full flex-1 relative bg-slate-950" style="height: calc(100vh - 60px);">
+    <iframe src="https://uplcm.com/4/12063392" class="w-full h-full border-0" scrolling="yes"></iframe>
   </div>
 
   <script>
-    // Start countdown immediately on page load
     let timeLeft = 20;
     const countdownEl = document.getElementById('countdown');
-    const badge = document.getElementById('countdown-badge');
+    const timerBadgeContainer = document.getElementById('timer-badge-container');
+    const claimForm = document.getElementById('claim-form');
 
     const downloadTimer = setInterval(function() {
       timeLeft--;
-      countdownEl.innerText = timeLeft;
-      let secs = timeLeft < 10 ? "0" + timeLeft : timeLeft;
-      badge.innerText = "00:" + secs;
+      countdownEl.innerText = timeLeft + "s";
       
       if (timeLeft <= 0) {
         clearInterval(downloadTimer);
-        document.getElementById('timer-box').classList.add('hidden');
-        document.getElementById('status-heading').innerText = "Ad Completed! 🎉";
-        document.getElementById('status-text').innerText = "Click below to collect your Poly Points.";
-        badge.classList.replace('bg-purple-600/20', 'bg-emerald-600/20');
-        badge.classList.replace('text-purple-300', 'text-emerald-400');
-        document.getElementById('claim-form').classList.remove('hidden');
+        timerBadgeContainer.classList.add('hidden');
+        claimForm.classList.remove('hidden');
       }
     }, 1000);
   </script>
