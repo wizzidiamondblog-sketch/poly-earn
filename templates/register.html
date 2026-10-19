@@ -1,60 +1,58 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Poly Earn - Register</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Poly Earn - Register</title>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-slate-900 text-white min-h-screen flex items-center justify-center p-4">
-    <div class="w-full max-w-md bg-slate-800 rounded-2xl shadow-2xl border border-slate-700 p-6 space-y-6">
-        <div class="text-center space-y-2">
-            <h1 class="text-3xl font-extrabold text-indigo-400 tracking-wide">Poly Earn</h1>
-            <p class="text-sm text-slate-400">Create a New Account</p>
-        </div>
+<body class="bg-slate-950 text-white flex items-center justify-center min-h-screen p-4">
 
-        {% with messages = get_flashed_messages(with_categories=true) %}
-          {% if messages %}
-            {% for category, message in messages %}
-              <div class="bg-red-500/10 border border-red-500 text-red-400 p-3 rounded-xl text-center text-sm font-medium">
-                {{ message }}
-              </div>
-            {% endfor %}
-          {% endif %}
-        {% endwith %}
-
-        <form action="/register" method="POST" class="space-y-4">
-            <div class="grid grid-cols-2 gap-2">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-1">FIRST NAME</label>
-                    <input type="text" name="first_name" required placeholder="First name" 
-                           class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition text-sm">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-1">LAST NAME</label>
-                    <input type="text" name="last_name" required placeholder="Last name" 
-                           class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition text-sm">
-                </div>
-            </div>
-            <div>
-                <label class="block text-xs font-semibold text-slate-400 mb-1">EMAIL ADDRESS</label>
-                <input type="email" name="email" required placeholder="Enter your email" 
-                       class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition">
-            </div>
-            <div>
-                <label class="block text-xs font-semibold text-slate-400 mb-1">PASSWORD</label>
-                <input type="password" name="password" required placeholder="Enter password" 
-                       class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition">
-            </div>
-            <button type="submit" 
-                    class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3.5 rounded-xl shadow-lg transition duration-200">
-                Continue & Verify Email
-            </button>
-        </form>
-
-        <p class="text-xs text-center text-slate-400">
-            Already have an account? <a href="/login" class="text-indigo-400 font-bold hover:underline">Login here</a>
-        </p>
+  <div class="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl">
+    
+    <div class="text-center space-y-2 mb-6">
+      <h1 class="text-3xl font-extrabold text-indigo-500 tracking-wide">Poly Earn</h1>
+      <p class="text-sm text-slate-400">Create a New Account</p>
     </div>
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="mb-4 p-3 rounded-xl text-center text-sm font-semibold border {% if category == 'error' %}bg-rose-500/10 border-rose-500/30 text-rose-400{% else %}bg-emerald-500/10 border-emerald-500/30 text-emerald-400{% endif %}">
+            {{ message }}
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <form action="/register" method="POST" class="space-y-4">
+      <div>
+        <label class="block text-xs font-semibold text-slate-400 mb-1 tracking-wider uppercase">Username</label>
+        <input type="text" name="username" placeholder="Enter username" required class="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 transition-all">
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-400 mb-1 tracking-wider uppercase">Email Address</label>
+        <input type="email" name="email" placeholder="Enter your email" required class="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 transition-all">
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-slate-400 mb-1 tracking-wider uppercase">Password</label>
+        <input type="password" name="password" placeholder="Enter password" required class="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 transition-all">
+      </div>
+
+      <button type="submit" class="w-full py-4 bg-indigo-600 hover:bg-indigo-500 font-bold rounded-xl text-white transition-all shadow-lg shadow-indigo-600/30 mt-2">
+        Register & Continue
+      </button>
+    </form>
+
+    <div class="mt-6 text-center text-xs text-slate-500">
+      Already have an account? 
+      <a href="/login" class="text-indigo-400 font-semibold hover:underline">Login here</a>
+    </div>
+
+  </div>
+
 </body>
 </html>
