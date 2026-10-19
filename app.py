@@ -1,6 +1,6 @@
 import os
 import sqlite3
-from flask import Flask, render_template, request, redirect, url_for, flash, session
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
@@ -24,6 +24,8 @@ def init_db():
             email TEXT UNIQUE NOT NULL,
             password TEXT NOT NULL,
             is_verified INTEGER DEFAULT 1,
+            points INTEGER DEFAULT 0,
+            ads_watched INTEGER DEFAULT 0,
             balance REAL DEFAULT 0.0,
             is_admin INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -54,7 +56,6 @@ def register():
 
         conn = get_db()
         cursor = conn.cursor()
-        
         existing_user = cursor.execute('SELECT id FROM users WHERE email = ?', (email,)).fetchone()
         
         if existing_user:
@@ -64,15 +65,14 @@ def register():
 
         hashed_password = generate_password_hash(password)
         cursor.execute('''
-            INSERT INTO users (first_name, last_name, email, password, is_verified)
-            VALUES (?, ?, ?, ?, 1)
+            INSERT INTO users (first_name, last_name, email, password, is_verified, points)
+            VALUES (?, ?, ?, ?, 1, 0)
         ''', (first_name, last_name, email, hashed_password))
         
         conn.commit()
         user_id = cursor.lastrowid
         conn.close()
 
-        # Log user in straight
         session['user_id'] = user_id
         session['user_name'] = f"{first_name} {last_name}"
         flash('Account created successfully! Welcome to Poly Earn.', 'success')
@@ -115,18 +115,35 @@ def dashboard():
 
     return render_template('dashboard.html', user=user)
 
-@app.route('/admin')
-def admin():
-    if 'user_id' not in session or not session.get('is_admin'):
-        flash('Access denied. Admin rights required.', 'danger')
-        return redirect(url_for('dashboard'))
+@app.route('/watch_ad', methods=['POST'])
+def watch_ad():
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
 
     conn = get_db()
     cursor = conn.cursor()
-    users = cursor.execute('SELECT id, first_name, last_name, email, is_verified, balance, created_at FROM users').fetchall()
-    conn.close()
+    user = cursor.execute('SELECT points, ads_watched FROM users WHERE id = ?', (session['user_id'],)).fetchone()
 
-    return render_template('admin.html', users=users)
+    if user:
+        new_ads = (user['ads_watched'] or 0) + 1
+        new_points = (user['points'] or 0) + 2
+        new_balance = round(new_points * 0.01, 2)  # 100 points = $1.00 USDT
+
+        cursor.execute('''
+            UPDATE users SET points = ?, ads_watched = ?, balance = ? WHERE id = ?
+        ''', (new_points, new_ads, new_balance, session['user_id']))
+        conn.commit()
+        conn.close()
+
+        return jsonify({
+            'success': True, 
+            'points': new_points, 
+            'ads_watched': new_ads,
+            'balance': new_balance
+        })
+
+    conn.close()
+    return jsonify({'success': False, 'message': 'User not found'}), 404
 
 @app.route('/logout')
 def logout():
@@ -137,4 +154,3 @@ def logout():
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
-        
