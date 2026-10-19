@@ -3,21 +3,21 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>X-Earn Network - Dashboard</title>
+  <title>Poly Earn - Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-[#0b0e14] text-white min-h-screen pb-24 font-sans select-none">
 
-  <!-- Top Header Bar -->
-  <div class="flex justify-between items-center px-4 py-3 bg-[#0b0e14]/80 backdrop-blur border-b border-slate-800/60 sticky top-0 z-50">
+  <!-- Top Navigation / Header -->
+  <div class="flex justify-between items-center px-4 py-3 bg-[#0b0e14]/90 backdrop-blur border-b border-slate-800/60 sticky top-0 z-50">
     <div class="flex items-center space-x-2">
-      <span class="text-lg font-black tracking-wide text-white">X-Earn Network</span>
+      <span class="text-base font-black tracking-wide bg-gradient-to-r from-purple-400 to-indigo-400 bg-clip-text text-transparent">Poly Earn</span>
     </div>
     <div class="flex items-center space-x-3">
-      <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-        <span class="w-1.5 h-1.5 mr-1.5 bg-emerald-400 rounded-full animate-pulse"></span> Online
+      <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+        <span class="w-1.5 h-1.5 mr-1 bg-emerald-400 rounded-full animate-pulse"></span> Online
       </span>
-      <a href="/logout" class="text-slate-400 hover:text-white text-xs font-semibold bg-slate-800/60 px-3 py-1.5 rounded-xl border border-slate-700">Logout</a>
+      <a href="/logout" class="text-slate-400 hover:text-white text-xs font-semibold bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-700">Logout</a>
     </div>
   </div>
 
@@ -35,130 +35,105 @@
       {% endif %}
     {% endwith %}
 
-    <!-- XP / Balance Card -->
-    <div class="bg-gradient-to-br from-[#151922] to-[#11141c] border border-slate-800/80 rounded-3xl p-5 relative overflow-hidden shadow-2xl">
-      <div class="absolute -right-4 -bottom-4 opacity-10 pointer-events-none">
-        <svg class="w-40 h-40 text-purple-400" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-      </div>
-      <p class="text-xs font-bold uppercase tracking-wider text-slate-400">YOUR XP</p>
-      <div class="flex justify-between items-end mt-1">
-        <div>
-          <h2 class="text-4xl font-black text-white tracking-tight">{{ points }} <span class="text-2xl font-bold text-purple-400">XP</span></h2>
-          <p class="text-xs font-medium text-emerald-400 mt-1 flex items-center">
-            <span class="mr-1">🟢</span> ≈$0.1277 USDT
-          </p>
-        </div>
-        <div class="w-16 h-16 bg-gradient-to-tr from-purple-600 to-indigo-400 rounded-2xl flex items-center justify-center shadow-lg shadow-purple-600/30">
-          <span class="text-2xl">💎</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- User Profile Strip -->
-    <div class="bg-[#151922] border border-slate-800/80 rounded-2xl p-3.5 flex items-center justify-between">
+    <!-- Profile & Status Header Card -->
+    <div class="bg-[#151922] border border-slate-800/80 rounded-2xl p-4 flex items-center justify-between shadow-lg">
       <div class="flex items-center space-x-3">
         <div class="w-12 h-12 rounded-xl bg-purple-600/20 border border-purple-500/30 flex items-center justify-center font-bold text-purple-400 text-lg">
           {{ username[0] | upper }}
         </div>
         <div>
-          <h3 class="font-bold text-sm text-white flex items-center">{{ username }} <span class="ml-1.5 text-xs">🐶</span></h3>
-          <p class="text-xs text-slate-400">@{{ username | lower }}22</p>
+          <h3 class="font-bold text-sm text-white flex items-center">{{ username }} <span class="ml-1 text-xs">🐶</span></h3>
+          <p class="text-[11px] text-slate-400">@{{ username | lower }}22 &bull; Telegram</p>
         </div>
       </div>
-      <span class="text-xs font-semibold bg-slate-800 text-slate-300 px-2.5 py-1 rounded-lg border border-slate-700">Telegram</span>
+      <div class="text-right">
+        <span class="text-[10px] bg-purple-500/10 text-purple-400 border border-purple-500/30 px-2 py-1 rounded-md font-bold">Active</span>
+      </div>
     </div>
 
-    <!-- Action Buttons Row -->
-    <div class="grid grid-cols-2 gap-3">
-      <a href="/watch-ad" class="py-3.5 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl font-bold text-sm text-center shadow-lg shadow-purple-600/20 flex items-center justify-center space-x-2">
-        <span>⚡ Earn XP</span>
-      </a>
-      <a href="#" onclick="alert('Withdraw feature coming soon!')" class="py-3.5 bg-[#151922] border border-slate-800 hover:bg-slate-800 rounded-2xl font-bold text-sm text-center text-slate-200 flex items-center justify-center space-x-2">
-        <span>💳 Withdraw</span>
+    <!-- YOUR XP / BALANCE CARD (Top Priority Position) -->
+    <div class="bg-gradient-to-br from-[#1a1f2c] via-[#151922] to-[#11141c] border border-purple-500/30 rounded-3xl p-5 relative overflow-hidden shadow-xl">
+      <div class="absolute -right-6 -bottom-6 opacity-10 pointer-events-none">
+        <svg class="w-44 h-44 text-purple-400" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      </div>
+      <p class="text-xs font-bold uppercase tracking-wider text-slate-400">YOUR TOTAL XP</p>
+      <div class="flex justify-between items-end mt-2">
+        <div>
+          <h2 class="text-4xl font-black text-white tracking-tight">{{ points }} <span class="text-2xl font-bold text-purple-400">XP</span></h2>
+          <p class="text-xs font-medium text-emerald-400 mt-1 flex items-center">
+            <span class="mr-1">🟢</span> Estimated value active
+          </p>
+        </div>
+        <div class="w-14 h-14 bg-gradient-to-tr from-purple-600 to-indigo-500 rounded-2xl flex items-center justify-center shadow-lg shadow-purple-600/30">
+          <span class="text-2xl">💎</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Primary Action: Watch Ad & Earn (The Green Pill Feature) -->
+    <div class="space-y-2">
+      <a href="/watch-ad" class="block w-full py-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-center font-bold rounded-2xl text-white transition-all shadow-lg shadow-emerald-600/30 flex items-center justify-center space-x-2">
+        <span class="text-lg">▶</span>
+        <span>Watch Ad & Earn (+10 Points)</span>
       </a>
     </div>
 
-    <!-- Stats 3-Grid -->
+    <!-- Stats Quick Grid -->
     <div class="grid grid-cols-3 gap-3">
       <div class="bg-[#151922] border border-slate-800/80 rounded-2xl p-3 text-center">
-        <p class="text-xs text-slate-400 font-medium">Tasks</p>
-        <p class="text-base font-bold text-white mt-1">15/19</p>
+        <p class="text-[11px] text-slate-400 font-medium">Tasks Done</p>
+        <p class="text-base font-bold text-white mt-1">1/19</p>
       </div>
       <div class="bg-[#151922] border border-slate-800/80 rounded-2xl p-3 text-center">
-        <p class="text-xs text-slate-400 font-medium">Streak</p>
-        <p class="text-base font-bold text-orange-400 mt-1">🔥 1</p>
+        <p class="text-[11px] text-slate-400 font-medium">Daily Streak</p>
+        <p class="text-base font-bold text-orange-400 mt-1">🔥 1 Day</p>
       </div>
       <div class="bg-[#151922] border border-slate-800/80 rounded-2xl p-3 text-center">
-        <p class="text-xs text-slate-400 font-medium">Refs</p>
-        <p class="text-base font-bold text-white mt-1">17</p>
+        <p class="text-[11px] text-slate-400 font-medium">Referrals</p>
+        <p class="text-base font-bold text-white mt-1">0</p>
       </div>
     </div>
 
-    <!-- Daily Check-in Card -->
-    <div class="bg-gradient-to-r from-purple-900/60 via-[#151922] to-[#151922] border border-purple-500/30 rounded-3xl p-4 space-y-3">
+    <!-- Daily Check-in Widget -->
+    <div class="bg-[#151922] border border-slate-800/80 rounded-3xl p-4 space-y-3">
       <div class="flex justify-between items-center">
         <div>
           <h4 class="font-bold text-sm text-white flex items-center">🔥 Daily Check-in</h4>
-          <p class="text-xs text-purple-300">Day 1 reward: +10 XP</p>
+          <p class="text-xs text-slate-400">Claim your daily reward</p>
         </div>
-        <button onclick="alert('Checked in successfully!')" class="px-4 py-2 bg-white text-slate-950 font-bold text-xs rounded-xl shadow-md hover:bg-slate-100 transition">
+        <button onclick="alert('Checked in successfully!')" class="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs rounded-xl shadow-md transition">
           Check In
         </button>
       </div>
-      <!-- Check-in Days pills -->
       <div class="grid grid-cols-7 gap-1.5 pt-1">
-        <div class="bg-purple-600/40 border border-purple-500 rounded-xl p-1.5 text-center">
+        <div class="bg-purple-600/30 border border-purple-500 rounded-xl p-1.5 text-center">
           <p class="text-[10px] text-purple-300 font-bold">D1</p>
           <p class="text-[10px] text-white font-extrabold mt-0.5">10</p>
         </div>
-        <div class="bg-slate-800/80 border border-slate-700/50 rounded-xl p-1.5 text-center opacity-60">
+        <div class="bg-slate-800/60 border border-slate-700/40 rounded-xl p-1.5 text-center opacity-60">
           <p class="text-[10px] text-slate-400 font-bold">D2</p>
           <p class="text-[10px] text-white font-extrabold mt-0.5">15</p>
         </div>
-        <div class="bg-slate-800/80 border border-slate-700/50 rounded-xl p-1.5 text-center opacity-60">
+        <div class="bg-slate-800/60 border border-slate-700/40 rounded-xl p-1.5 text-center opacity-60">
           <p class="text-[10px] text-slate-400 font-bold">D3</p>
           <p class="text-[10px] text-white font-extrabold mt-0.5">20</p>
         </div>
-        <div class="bg-slate-800/80 border border-slate-700/50 rounded-xl p-1.5 text-center opacity-60">
+        <div class="bg-slate-800/60 border border-slate-700/40 rounded-xl p-1.5 text-center opacity-60">
           <p class="text-[10px] text-slate-400 font-bold">D4</p>
           <p class="text-[10px] text-white font-extrabold mt-0.5">30</p>
         </div>
-        <div class="bg-slate-800/80 border border-slate-700/50 rounded-xl p-1.5 text-center opacity-60">
+        <div class="bg-slate-800/60 border border-slate-700/40 rounded-xl p-1.5 text-center opacity-60">
           <p class="text-[10px] text-slate-400 font-bold">D5</p>
           <p class="text-[10px] text-white font-extrabold mt-0.5">40</p>
         </div>
-        <div class="bg-slate-800/80 border border-slate-700/50 rounded-xl p-1.5 text-center opacity-60">
+        <div class="bg-slate-800/60 border border-slate-700/40 rounded-xl p-1.5 text-center opacity-60">
           <p class="text-[10px] text-slate-400 font-bold">D6</p>
           <p class="text-[10px] text-white font-extrabold mt-0.5">50</p>
         </div>
-        <div class="bg-slate-800/80 border border-slate-700/50 rounded-xl p-1.5 text-center opacity-60">
+        <div class="bg-slate-800/60 border border-slate-700/40 rounded-xl p-1.5 text-center opacity-60">
           <p class="text-[10px] text-slate-400 font-bold">D7</p>
           <p class="text-[10px] text-white font-extrabold mt-0.5">100</p>
         </div>
-      </div>
-    </div>
-
-    <!-- Watch Ads & Earn Section -->
-    <div class="space-y-3">
-      <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 px-1">Watch Ads & Earn!</h4>
-      
-      <!-- Ad Card 1 -->
-      <div class="bg-gradient-to-r from-blue-950/60 to-[#151922] border border-blue-500/30 rounded-2xl p-4 flex items-center justify-between">
-        <div class="flex items-center space-x-3">
-          <div class="w-12 h-12 bg-sky-500 rounded-2xl flex items-center justify-center shadow-lg shadow-sky-500/30 text-white font-bold text-xl">
-            ▶
-          </div>
-          <div>
-            <div class="flex items-center space-x-2">
-              <h5 class="font-bold text-sm text-white">WATCH AD #1</h5>
-              <span class="bg-amber-500 text-slate-950 font-black text-[9px] px-1.5 py-0.5 rounded">HOT</span>
-            </div>
-            <p class="text-xs text-sky-300 font-medium mt-0.5">💎 100 XP</p>
-          </div>
-        </div>
-        <a href="/watch-ad" class="px-5 py-2.5 bg-sky-500 hover:bg-sky-400 text-slate-950 font-extrabold text-xs rounded-xl shadow-md transition">
-          Watch
-        </a>
       </div>
     </div>
 
