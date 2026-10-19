@@ -6,247 +6,87 @@
     <title>Poly Earn - Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-slate-950 text-white min-h-screen font-sans pb-12">
-
-    <!-- Top Navigation -->
-    <nav class="flex justify-between items-center px-6 py-4 border-b border-slate-800 bg-slate-900/60 backdrop-blur-md sticky top-0 z-50">
-        <h1 class="text-xl font-extrabold text-emerald-400 tracking-wide flex items-center gap-2">
-            ⚡ Poly Earn
-        </h1>
-        <div class="flex gap-3">
-            <span class="text-xs bg-slate-800 text-gray-300 px-3 py-2 rounded-xl border border-slate-700/80 self-center font-medium">@{{ user.username }}</span>
-            <a href="/logout" class="text-xs bg-rose-600/20 text-rose-400 hover:bg-rose-600/30 px-3 py-2 rounded-xl border border-rose-500/30 font-semibold self-center transition">Logout</a>
+<body class="bg-slate-950 text-white min-h-screen p-4 flex flex-col justify-between">
+    <div class="max-w-md mx-auto w-full space-y-6">
+        <!-- Header -->
+        <div class="flex items-center justify-between">
+            <h1 class="text-2xl font-bold text-emerald-400 flex items-center gap-2">⚡ Poly Earn</h1>
+            <a href="/logout" class="bg-rose-950/50 text-rose-300 border border-rose-800/50 px-4 py-1.5 rounded-lg text-sm font-medium">Logout</a>
         </div>
-    </nav>
 
-    <div class="max-w-md mx-auto px-4 mt-6 space-y-6">
-
-        <!-- SECTION 1: BALANCE & REDEEM HUB -->
-        <div class="bg-gradient-to-br from-slate-900 to-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-2xl relative overflow-hidden space-y-5">
-            <div class="absolute -right-8 -top-8 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
-            
-            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
-                <p class="text-xs uppercase tracking-wider text-gray-400 font-extrabold">Portfolio Overview</p>
-                <div class="bg-emerald-500/10 border border-emerald-500/30 px-3 py-1 rounded-xl">
-                    <span class="text-[10px] uppercase font-bold text-emerald-400">Rate: 4,000 Pts = $20 USDT</span>
-                </div>
+        <!-- Stats Cards -->
+        <div class="grid grid-cols-2 gap-4">
+            <div class="bg-slate-900/80 border border-slate-800 p-4 rounded-xl">
+                <p class="text-xs text-slate-400 font-semibold tracking-wide uppercase">USDT VALUE</p>
+                <p class="text-2xl font-bold text-white mt-1">$<span id="balance">{{ user['balance'] or '0.00' }}</span></p>
             </div>
-
-            <!-- 3 METRIC CARDS -->
-            <div class="grid grid-cols-2 gap-3">
-                <!-- Card 1: Available Points -->
-                <div class="bg-slate-950/80 border border-slate-800 p-4 rounded-xl col-span-2">
-                    <p class="text-[11px] text-gray-400 uppercase font-semibold">Available Points</p>
-                    <p id="user-points" class="text-3xl font-black text-emerald-400 mt-0.5">{{ user.points }} Pts</p>
-                </div>
-
-                <!-- Card 2: USD Balance -->
-                <div class="bg-slate-950/80 border border-slate-800 p-3.5 rounded-xl">
-                    <p class="text-[10px] text-gray-400 uppercase font-semibold">USDT Value</p>
-                    <p id="user-usdt" class="text-xl font-extrabold text-white mt-0.5">${{ usdt_balance }}</p>
-                </div>
-
-                <!-- Card 3: Used / Redeemed Points -->
-                <div class="bg-slate-950/80 border border-slate-800 p-3.5 rounded-xl">
-                    <p class="text-[10px] text-gray-400 uppercase font-semibold">Redeemed Points</p>
-                    <p class="text-xl font-extrabold text-amber-400 mt-0.5">{{ used_points }} Pts</p>
-                </div>
-            </div>
-
-            <!-- Redeem / Payout Box -->
-            <div class="space-y-2 pt-2">
-                <label class="text-xs font-bold text-gray-300 block">Redeem Points to Polygon USDT</label>
-                <input type="text" id="wallet-input" placeholder="Paste Polygon USDT Address (0x...)" class="w-full bg-slate-950 text-xs text-gray-200 border border-slate-800 rounded-xl px-4 py-3.5 focus:outline-none focus:border-emerald-500 font-mono transition">
-                <button onclick="submitPayout()" class="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold py-3.5 rounded-xl shadow-lg shadow-emerald-500/20 transition active:scale-[0.98]">
-                    Redeem Payout (Min {{ min_payout_points }} Pts)
-                </button>
+            <div class="bg-slate-900/80 border border-slate-800 p-4 rounded-xl">
+                <p class="text-xs text-slate-400 font-semibold tracking-wide uppercase">REDEEMED POINTS</p>
+                <p class="text-2xl font-bold text-amber-400 mt-1"><span id="points">{{ user['points'] or 0 }}</span> <span class="text-sm font-normal">Pts</span></p>
             </div>
         </div>
 
-        <!-- SECTION 2: EARNING TASKS HUB -->
-        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-            <div class="flex justify-between items-center">
-                <h2 class="text-base font-bold text-gray-100">Watch & Earn Tasks</h2>
-                <span class="text-[11px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-lg font-semibold">+2 Points / Ad</span>
-            </div>
-            
-            <!-- Ad Counter Badge -->
-            <div class="flex justify-between items-center text-xs bg-slate-950 p-3.5 rounded-xl border border-slate-800">
-                <span class="text-gray-400 font-medium">Ads watched this window:</span>
-                <span id="ad-counter" class="font-bold text-emerald-400">{{ user.ads_watched }} / 25</span>
-            </div>
+        <!-- Redeem Section -->
+        <div class="bg-slate-900/80 border border-slate-800 p-4 rounded-xl space-y-3">
+            <p class="text-sm font-medium text-slate-300">Redeem Points to Polygon USDT</p>
+            <input type="text" placeholder="Paste Polygon USDT Address (0x...)" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-sm focus:outline-none focus:border-emerald-500 font-mono text-slate-300">
+            <button class="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold p-3 rounded-lg text-sm transition">Redeem Payout (Min Pts)</button>
+        </div>
 
-            <!-- Cooldown Display -->
-            <div id="cooldown-box" class="hidden text-center p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-1">
-                <p class="text-xs text-amber-400 font-semibold">2-Hour Window Cooldown Active</p>
-                <p id="cooldown-timer" class="text-xl font-extrabold text-amber-300">00:00:00</p>
+        <!-- Watch Tasks -->
+        <div class="bg-slate-900/80 border border-slate-800 p-4 rounded-xl space-y-4">
+            <div class="flex items-center justify-between">
+                <h3 class="font-bold text-white">Watch & Earn Tasks</h3>
+                <span class="text-xs bg-emerald-950 text-emerald-400 border border-emerald-800/50 px-2 py-1 rounded">+2 Points / Ad</span>
             </div>
-
-            <!-- Timer Modal Area -->
-            <div id="timer-box" class="hidden text-center p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl space-y-1">
-                <p class="text-xs text-emerald-300 font-medium">Please watch ad carefully...</p>
-                <p id="ad-timer" class="text-3xl font-black text-emerald-400">60s</p>
+            <div class="bg-slate-950 border border-slate-800 p-3 rounded-lg flex items-center justify-between text-sm">
+                <span class="text-slate-400">Ads watched this window:</span>
+                <span class="font-bold text-emerald-400"><span id="ads-watched">{{ user['ads_watched'] or 0 }}</span> / 25</span>
             </div>
-
-            <!-- Action Buttons -->
-            <button id="start-ad-btn" onclick="startAdTimer()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold py-3.5 rounded-xl shadow-lg shadow-indigo-600/20 transition active:scale-[0.98]">
+            <button id="watch-btn" onclick="startWatchTask()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold p-3.5 rounded-xl text-sm transition shadow-lg shadow-indigo-600/30">
                 Start Watch Task (+2 Points)
             </button>
-
-            <button id="claim-ad-btn" onclick="claimReward()" class="hidden w-full bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold py-3.5 rounded-xl shadow-lg shadow-amber-400/20 transition active:scale-[0.98]">
-                Click Here & Claim +2 Points
-            </button>
         </div>
 
-        <!-- SECTION 3: INVITE & EARN HUB -->
-        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-3">
-            <h2 class="text-base font-bold text-gray-100">Invite & Earn</h2>
-            <p class="text-xs text-gray-400">Earn +10 points instantly when your friends join through your link!</p>
-
-            <div class="flex items-center gap-2">
-                <input type="text" readonly value="https://poly-earn.onrender.com/register?ref={{ user.ref_code }}" id="ref-link" class="w-full bg-slate-950 text-xs text-emerald-400 border border-slate-800 rounded-xl px-3 py-3.5 focus:outline-none font-mono">
-                <button onclick="copyRefLink()" class="bg-slate-800 hover:bg-slate-700 text-xs font-semibold px-4 py-3.5 rounded-xl border border-slate-700 transition">Copy</button>
-            </div>
+        <!-- Invite -->
+        <div class="bg-slate-900/80 border border-slate-800 p-4 rounded-xl space-y-2">
+            <h3 class="font-bold text-white">Invite & Earn</h3>
+            <p class="text-xs text-slate-400">Earn +10 points instantly when your friends join through your link!</p>
         </div>
-
-        <!-- SECTION 4: WITHDRAWAL HISTORY -->
-        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-3">
-            <h2 class="text-base font-bold text-gray-100">Recent Payout Requests</h2>
-            <div class="space-y-2">
-                {% for p in payouts %}
-                <div class="bg-slate-950 border border-slate-800 p-3.5 rounded-xl flex justify-between items-center text-xs">
-                    <div>
-                        <p class="font-bold text-emerald-400">${{ p.usdt_amount }} USDT</p>
-                        <p class="text-[10px] text-gray-400 font-mono mt-0.5">{{ p.wallet_address[:10] }}...{{ p.wallet_address[-6:] }}</p>
-                    </div>
-                    <div>
-                        <span class="px-2.5 py-1 rounded-lg font-bold text-[10px] 
-                            {% if p.status == 'Approved' %}bg-emerald-500/20 text-emerald-400
-                            {% elif p.status == 'Declined' %}bg-rose-500/20 text-rose-400
-                            {% else %}bg-amber-500/20 text-amber-400{% endif %}">
-                            {{ p.status }}
-                        </span>
-                    </div>
-                </div>
-                {% else %}
-                <p class="text-xs text-gray-500 text-center py-2">No payout requests made yet.</p>
-                {% endfor %}
-            </div>
-        </div>
-
     </div>
 
     <script>
-        const monetagUrl = "{{ monetag_link }}";
-        let cooldownSecs = {{ cooldown_seconds }};
-        let adCountdown = 60;
-        let timerInterval;
+        function startWatchTask() {
+            const btn = document.getElementById('watch-btn');
+            btn.disabled = true;
+            btn.innerText = "Watching Ad...";
 
-        const startBtn = document.getElementById('start-ad-btn');
-        const claimBtn = document.getElementById('claim-ad-btn');
-        const timerBox = document.getElementById('timer-box');
-        const adTimerDisplay = document.getElementById('ad-timer');
-        const cooldownBox = document.getElementById('cooldown-box');
-        const cooldownTimerDisplay = document.getElementById('cooldown-timer');
-
-        if (cooldownSecs > 0) {
-            triggerCooldown(cooldownSecs);
-        }
-
-        function startAdTimer() {
-            startBtn.classList.add('hidden');
-            timerBox.classList.remove('hidden');
-            adCountdown = 60;
-            adTimerDisplay.innerText = adCountdown + "s";
-
-            timerInterval = setInterval(() => {
-                adCountdown--;
-                adTimerDisplay.innerText = adCountdown + "s";
-
-                if (adCountdown <= 0) {
-                    clearInterval(timerInterval);
-                    timerBox.classList.add('hidden');
-                    claimBtn.classList.remove('hidden');
-                }
-            }, 1000);
-        }
-
-        function claimReward() {
-            window.open(monetagUrl, '_blank');
-
-            fetch('/reward-ad', {
+            fetch('/watch_ad', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' }
             })
             .then(res => res.json())
             .then(data => {
                 if (data.success) {
-                    document.getElementById('user-points').innerText = data.new_points + " Pts";
-                    document.getElementById('user-usdt').innerText = "$" + data.new_usdt;
-                    document.getElementById('ad-counter').innerText = data.ads_watched + " / 25";
-
-                    claimBtn.classList.add('hidden');
-                    startBtn.classList.remove('hidden');
-
-                    if (data.ads_watched >= 25) {
-                        triggerCooldown(7200);
-                    }
+                    document.getElementById('points').innerText = data.points;
+                    document.getElementById('ads-watched').innerText = data.ads_watched;
+                    document.getElementById('balance').innerText = data.balance;
+                    btn.innerText = "Success! +2 Points Added";
+                    setTimeout(() => {
+                        btn.disabled = false;
+                        btn.innerText = "Start Watch Task (+2 Points)";
+                    }, 2000);
                 } else {
-                    alert(data.message);
-                    location.reload();
+                    alert('Error adding points.');
+                    btn.disabled = false;
+                    btn.innerText = "Start Watch Task (+2 Points)";
                 }
-            });
-        }
-
-        function triggerCooldown(seconds) {
-            startBtn.classList.add('hidden');
-            claimBtn.classList.add('hidden');
-            timerBox.classList.add('hidden');
-            cooldownBox.classList.remove('hidden');
-
-            let secRem = seconds;
-            const cInterval = setInterval(() => {
-                secRem--;
-                let hrs = Math.floor(secRem / 3600);
-                let mins = Math.floor((secRem % 3600) / 60);
-                let secs = secRem % 60;
-
-                cooldownTimerDisplay.innerText = 
-                    (hrs < 10 ? "0" : "") + hrs + ":" + 
-                    (mins < 10 ? "0" : "") + mins + ":" + 
-                    (secs < 10 ? "0" : "") + secs;
-
-                if (secRem <= 0) {
-                    clearInterval(cInterval);
-                    location.reload();
-                }
-            }, 1000);
-        }
-
-        function submitPayout() {
-            const address = document.getElementById('wallet-input').value.trim();
-            if(!address) {
-                alert('Please enter your Polygon USDT wallet address.');
-                return;
-            }
-
-            fetch('/request-payout', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ wallet_address: address })
             })
-            .then(res => res.json())
-            .then(data => {
-                alert(data.message);
-                if(data.success) location.reload();
+            .catch(err => {
+                console.error(err);
+                btn.disabled = false;
+                btn.innerText = "Start Watch Task (+2 Points)";
             });
-        }
-
-        function copyRefLink() {
-            const input = document.getElementById('ref-link');
-            input.select();
-            document.execCommand('copy');
-            alert('Referral link copied!');
         }
     </script>
 </body>
