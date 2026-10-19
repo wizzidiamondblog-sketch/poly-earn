@@ -1,6 +1,7 @@
 import os
 import sqlite3
 import psycopg2
+import traceback
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -134,7 +135,6 @@ def dashboard():
     if 'user_id' not in session:
         return redirect(url_for('login'))
         
-    points = 0
     try:
         conn = get_db()
         cursor = conn.cursor()
@@ -145,15 +145,14 @@ def dashboard():
             cursor.execute("SELECT points FROM users WHERE id = ?", (session['user_id'],))
             
         row = cursor.fetchone()
-        if row:
-            points = row[0]
+        points = row[0] if row else 0
             
         cursor.close()
         conn.close()
+        
+        return render_template('dashboard.html', username=session.get('username', 'User'), points=points)
     except Exception as e:
-        points = 0
-    
-    return render_template('dashboard.html', username=session.get('username', 'User'), points=points)
+        return f"<h1>Dashboard Crash Error:</h1><pre>{traceback.format_exc()}</pre>"
 
 @app.route('/watch-ad')
 def watch_ad():
@@ -191,4 +190,4 @@ def logout():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
-            
+        
