@@ -1,23 +1,24 @@
 import os
 import sqlite3
 import psycopg2
-from psycopg2.extras import RealDictCursor
+from psycopg2.extras import DictCursor
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'poly_earn_super_secret_2026')
 
+# Render provides postgres:// but psycopg2 requires postgresql://
 DATABASE_URL = os.environ.get('DATABASE_URL')
+if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 # --- Database Helper Connection ---
 def get_db():
     if DATABASE_URL:
-        # PostgreSQL for Render Deployment
         conn = psycopg2.connect(DATABASE_URL, sslmode='require')
         return conn
     else:
-        # SQLite for Local Development
         conn = sqlite3.connect('poly_earn.db')
         conn.row_factory = sqlite3.Row
         return conn
@@ -27,7 +28,6 @@ def init_db():
     cursor = conn.cursor()
     
     if DATABASE_URL:
-        # PostgreSQL Syntax
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
@@ -39,13 +39,12 @@ def init_db():
             );
         ''')
     else:
-        # SQLite Syntax
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT UNIQUE NOT NULL,
                 email TEXT UNIQUE NOT NULL,
-                password TEXT NOT NULL,
+                password TEXT UNIQUE NOT NULL,
                 points INTEGER DEFAULT 0,
                 is_admin INTEGER DEFAULT 0
             );
@@ -55,13 +54,12 @@ def init_db():
     cursor.close()
     conn.close()
 
-# Initialize Database Table on Startup
 try:
     init_db()
 except Exception as e:
     print(f"Database init info: {e}")
 
-# --- Application Routes ---
+# --- Routes ---
 
 @app.route('/')
 def home():
@@ -76,6 +74,10 @@ def register():
         email = request.form.get('email')
         password = request.form.get('password')
         
+        if not username or not email or not password:
+            flash("All fields are required!", "error")
+            return redirect(url_for('register'))
+
         hashed_password = generate_password_hash(password)
         
         conn = get_db()
@@ -110,17 +112,14 @@ def login():
         password = request.form.get('password')
         
         conn = get_db()
-        cursor = conn.cursor()
         
         if DATABASE_URL:
+            # Use DictCursor for PostgreSQL so we can access columns by name
+            cursor = conn.cursor(cursor_factory=DictCursor)
             cursor.execute("SELECT * FROM users WHERE email = %s", (email,))
-            user_raw = cursor.fetchone()
-            if user_raw:
-                colnames = [desc[0] for desc in cursor.description]
-                user = dict(zip(colnames, user_raw))
-            else:
-                user = None
+            user = cursor.fetchone()
         else:
+            cursor = conn.cursor()
             cursor.execute("SELECT * FROM users WHERE email = ?", (email,))
             user = cursor.fetchone()
 
@@ -172,7 +171,6 @@ def claim_reward():
     conn = get_db()
     cursor = conn.cursor()
     
-    # Reward 10 points per ad viewed
     if DATABASE_URL:
         cursor.execute("UPDATE users SET points = points + 10 WHERE id = %s", (session['user_id'],))
     else:
@@ -192,3 +190,4 @@ def logout():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
+        
