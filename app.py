@@ -1,7 +1,6 @@
 import os
 import sqlite3
 import psycopg2
-from psycopg2.extras import DictCursor
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -25,12 +24,9 @@ def init_db():
     try:
         conn = get_db()
         cursor = conn.cursor()
-        
         if DATABASE_URL:
-            # Drop old table to clear all mismatch schema errors
-            cursor.execute("DROP TABLE IF EXISTS users CASCADE;")
             cursor.execute('''
-                CREATE TABLE users (
+                CREATE TABLE IF NOT EXISTS users (
                     id SERIAL PRIMARY KEY,
                     username VARCHAR(80) UNIQUE NOT NULL,
                     email VARCHAR(120) UNIQUE NOT NULL,
@@ -40,9 +36,8 @@ def init_db():
                 );
             ''')
         else:
-            cursor.execute("DROP TABLE IF EXISTS users;")
             cursor.execute('''
-                CREATE TABLE users (
+                CREATE TABLE IF NOT EXISTS users (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     username TEXT UNIQUE NOT NULL,
                     email TEXT UNIQUE NOT NULL,
@@ -51,13 +46,11 @@ def init_db():
                     is_admin INTEGER DEFAULT 0
                 );
             ''')
-        
         conn.commit()
         cursor.close()
         conn.close()
-        print("Database initialized successfully!")
     except Exception as e:
-        print(f"Database Init Error: {e}")
+        print(f"Init DB Error: {e}")
 
 init_db()
 
@@ -112,26 +105,27 @@ def login():
         
         try:
             conn = get_db()
+            cursor = conn.cursor()
+            
             if DATABASE_URL:
-                cursor = conn.cursor(cursor_factory=DictCursor)
-                cursor.execute("SELECT * FROM users WHERE email = %s", (email,))
-                user = cursor.fetchone()
+                cursor.execute("SELECT id, username, email, password, points FROM users WHERE email = %s", (email,))
             else:
-                cursor = conn.cursor()
-                cursor.execute("SELECT * FROM users WHERE email = ?", (email,))
-                user = cursor.fetchone()
-
+                cursor.execute("SELECT id, username, email, password, points FROM users WHERE email = ?", (email,))
+                
+            user_row = cursor.fetchone()
             cursor.close()
             conn.close()
             
-            if user and check_password_hash(user['password'], password):
-                session['user_id'] = user['id']
-                session['username'] = user['username']
-                return redirect(url_for('dashboard'))
-            else:
-                flash("Invalid email or password!", "error")
+            if user_row:
+                user_id, username, db_email, db_password, points = user_row
+                if check_password_hash(db_password, password):
+                    session['user_id'] = user_id
+                    session['username'] = username
+                    return redirect(url_for('dashboard'))
+            
+            flash("Invalid email or password!", "error")
         except Exception as e:
-            flash("Login error occurred. Try again.", "error")
+            flash(f"Login error: {str(e)}", "error")
             
     return render_template('login.html')
 
@@ -147,14 +141,12 @@ def dashboard():
         
         if DATABASE_URL:
             cursor.execute("SELECT points FROM users WHERE id = %s", (session['user_id'],))
-            row = cursor.fetchone()
-            if row:
-                points = row[0]
         else:
             cursor.execute("SELECT points FROM users WHERE id = ?", (session['user_id'],))
-            row = cursor.fetchone()
-            if row:
-                points = row['points']
+            
+        row = cursor.fetchone()
+        if row:
+            points = row[0]
             
         cursor.close()
         conn.close()
@@ -188,7 +180,7 @@ def claim_reward():
         conn.close()
         flash("Reward claimed! +10 Points added.", "success")
     except Exception as e:
-        flash("Failed to claim reward. Try again.", "error")
+        flash("Failed to claim reward.", "error")
         
     return redirect(url_for('dashboard'))
 
@@ -199,4 +191,4 @@ def logout():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
-    
+            
