@@ -1,40 +1,67 @@
 import os
 import sqlite3
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
+import psycopg2
+from psycopg2.extras import RealDictCursor
+from flask import Flask, render_template, request, redirect, url_for, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'poly_earn_super_secret_key_2026')
+app.secret_key = os.environ.get('SECRET_KEY', 'poly_earn_super_secret_2026')
 
-DB_NAME = 'poly_earn.db'
+DATABASE_URL = os.environ.get('DATABASE_URL')
 
+# --- Database Helper Connection ---
 def get_db():
-    conn = sqlite3.connect(DB_NAME)
-    conn.row_factory = sqlite3.Row
-    return conn
+    if DATABASE_URL:
+        # PostgreSQL for Render Deployment
+        conn = psycopg2.connect(DATABASE_URL, sslmode='require')
+        return conn
+    else:
+        # SQLite for Local Development
+        conn = sqlite3.connect('poly_earn.db')
+        conn.row_factory = sqlite3.Row
+        return conn
 
 def init_db():
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            first_name TEXT NOT NULL,
-            last_name TEXT NOT NULL,
-            email TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL,
-            is_verified INTEGER DEFAULT 1,
-            points INTEGER DEFAULT 0,
-            ads_watched INTEGER DEFAULT 0,
-            balance REAL DEFAULT 0.0,
-            is_admin INTEGER DEFAULT 0,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
+    
+    if DATABASE_URL:
+        # PostgreSQL Syntax
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                username VARCHAR(80) UNIQUE NOT NULL,
+                email VARCHAR(120) UNIQUE NOT NULL,
+                password TEXT NOT NULL,
+                points INT DEFAULT 0,
+                is_admin BOOLEAN DEFAULT FALSE
+            );
+        ''')
+    else:
+        # SQLite Syntax
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                password TEXT NOT NULL,
+                points INTEGER DEFAULT 0,
+                is_admin INTEGER DEFAULT 0
+            );
+        ''')
+    
     conn.commit()
+    cursor.close()
     conn.close()
 
-init_db()
+# Initialize Database Table on Startup
+try:
+    init_db()
+except Exception as e:
+    print(f"Database init info: {e}")
+
+# --- Application Routes ---
 
 @app.route('/')
 def home():
@@ -45,116 +72,123 @@ def home():
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
-        first_name = request.form.get('first_name', '').strip()
-        last_name = request.form.get('last_name', '').strip()
-        email = request.form.get('email', '').strip().lower()
-        password = request.form.get('password', '')
-
-        if not first_name or not last_name or not email or not password:
-            flash('All fields are required.', 'danger')
-            return render_template('register.html')
-
+        username = request.form.get('username')
+        email = request.form.get('email')
+        password = request.form.get('password')
+        
+        hashed_password = generate_password_hash(password)
+        
         conn = get_db()
         cursor = conn.cursor()
-        existing_user = cursor.execute('SELECT id FROM users WHERE email = ?', (email,)).fetchone()
-        
-        if existing_user:
-            conn.close()
-            flash('Email already registered. Please login.', 'info')
+        try:
+            if DATABASE_URL:
+                cursor.execute(
+                    "INSERT INTO users (username, email, password) VALUES (%s, %s, %s)",
+                    (username, email, hashed_password)
+                )
+            else:
+                cursor.execute(
+                    "INSERT INTO users (username, email, password) VALUES (?, ?, ?)",
+                    (username, email, hashed_password)
+                )
+            conn.commit()
+            flash("Registration successful! Please login.", "success")
             return redirect(url_for('login'))
-
-        hashed_password = generate_password_hash(password)
-        cursor.execute('''
-            INSERT INTO users (first_name, last_name, email, password, is_verified, points)
-            VALUES (?, ?, ?, ?, 1, 0)
-        ''', (first_name, last_name, email, hashed_password))
-        
-        conn.commit()
-        user_id = cursor.lastrowid
-        conn.close()
-
-        session['user_id'] = user_id
-        session['user_name'] = f"{first_name} {last_name}"
-        flash('Account created successfully! Welcome to Poly Earn.', 'success')
-        return redirect(url_for('dashboard'))
-
+        except Exception as e:
+            conn.rollback()
+            flash("Username or Email already exists!", "error")
+        finally:
+            cursor.close()
+            conn.close()
+            
     return render_template('register.html')
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        email = request.form.get('email', '').strip().lower()
-        password = request.form.get('password', '')
-
+        email = request.form.get('email')
+        password = request.form.get('password')
+        
         conn = get_db()
         cursor = conn.cursor()
-        user = cursor.execute('SELECT * FROM users WHERE email = ?', (email,)).fetchone()
-        conn.close()
+        
+        if DATABASE_URL:
+            cursor.execute("SELECT * FROM users WHERE email = %s", (email,))
+            user_raw = cursor.fetchone()
+            if user_raw:
+                colnames = [desc[0] for desc in cursor.description]
+                user = dict(zip(colnames, user_raw))
+            else:
+                user = None
+        else:
+            cursor.execute("SELECT * FROM users WHERE email = ?", (email,))
+            user = cursor.fetchone()
 
+        cursor.close()
+        conn.close()
+        
         if user and check_password_hash(user['password'], password):
             session['user_id'] = user['id']
-            session['user_name'] = f"{user['first_name']} {user['last_name']}"
-            session['is_admin'] = user['is_admin']
-            flash('Logged in successfully!', 'success')
+            session['username'] = user['username']
             return redirect(url_for('dashboard'))
         else:
-            flash('Invalid email or password.', 'danger')
-
+            flash("Invalid email or password!", "error")
+            
     return render_template('login.html')
 
 @app.route('/dashboard')
 def dashboard():
     if 'user_id' not in session:
-        flash('Please login to access dashboard.', 'warning')
         return redirect(url_for('login'))
-
+        
     conn = get_db()
     cursor = conn.cursor()
-    user = cursor.execute('SELECT * FROM users WHERE id = ?', (session['user_id'],)).fetchone()
+    
+    if DATABASE_URL:
+        cursor.execute("SELECT points FROM users WHERE id = %s", (session['user_id'],))
+        row = cursor.fetchone()
+        points = row[0] if row else 0
+    else:
+        cursor.execute("SELECT points FROM users WHERE id = ?", (session['user_id'],))
+        row = cursor.fetchone()
+        points = row['points'] if row else 0
+        
+    cursor.close()
     conn.close()
+    
+    return render_template('dashboard.html', username=session.get('username'), points=points)
 
-    return render_template('dashboard.html', user=user)
-
-@app.route('/watch_ad', methods=['POST'])
+@app.route('/watch-ad')
 def watch_ad():
     if 'user_id' not in session:
-        return jsonify({'success': False, 'message': 'Unauthorized'}), 401
+        return redirect(url_for('login'))
+    return render_template('watch_ad.html')
 
+@app.route('/claim-reward', methods=['POST'])
+def claim_reward():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+        
     conn = get_db()
     cursor = conn.cursor()
-    user = cursor.execute('SELECT points, ads_watched FROM users WHERE id = ?', (session['user_id'],)).fetchone()
-
-    if user:
-        new_ads = (user['ads_watched'] or 0) + 1
-        new_points = (user['points'] or 0) + 2
-        new_balance = round(new_points * 0.01, 2)  # 100 points = $1.00 USDT
-
-        cursor.execute('''
-            UPDATE users SET points = ?, ads_watched = ?, balance = ? WHERE id = ?
-        ''', (new_points, new_ads, new_balance, session['user_id']))
-        conn.commit()
-        conn.close()
-
-        return jsonify({
-            'success': True, 
-            'points': new_points, 
-            'ads_watched': new_ads,
-            'balance': new_balance
-        })
-
+    
+    # Reward 10 points per ad viewed
+    if DATABASE_URL:
+        cursor.execute("UPDATE users SET points = points + 10 WHERE id = %s", (session['user_id'],))
+    else:
+        cursor.execute("UPDATE users SET points = points + 10 WHERE id = ?", (session['user_id'],))
+        
+    conn.commit()
+    cursor.close()
     conn.close()
-    return jsonify({'success': False, 'message': 'User not found'}), 404
+    
+    flash("Reward claimed! +10 Points added.", "success")
+    return redirect(url_for('dashboard'))
 
 @app.route('/logout')
 def logout():
     session.clear()
-    flash('Logged out successfully.', 'info')
     return redirect(url_for('login'))
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
-@app.route('/watch-ad')
-def watch_ad():
-    return render_template('watch_ad.html')
-    
+    app.run(host='0.0.0.0', port=5000, debug=True)
