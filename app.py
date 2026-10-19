@@ -69,6 +69,25 @@ def init_db():
                     is_admin BOOLEAN NOT NULL DEFAULT FALSE
                 )
             """)
+
+            # Add missing columns to an existing PostgreSQL table.
+            cursor.execute("""
+                ALTER TABLE users
+                ADD COLUMN IF NOT EXISTS ads_watched_count
+                INTEGER NOT NULL DEFAULT 0
+            """)
+
+            cursor.execute("""
+                ALTER TABLE users
+                ADD COLUMN IF NOT EXISTS last_ad_time TIMESTAMP
+            """)
+
+            cursor.execute("""
+                ALTER TABLE users
+                ADD COLUMN IF NOT EXISTS is_admin
+                BOOLEAN NOT NULL DEFAULT FALSE
+            """)
+
         else:
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS users (
@@ -82,6 +101,34 @@ def init_db():
                     is_admin INTEGER NOT NULL DEFAULT 0
                 )
             """)
+
+            # Add missing columns to an existing SQLite table.
+            cursor.execute("PRAGMA table_info(users)")
+            columns = {row[1] for row in cursor.fetchall()}
+
+            if "points" not in columns:
+                cursor.execute("""
+                    ALTER TABLE users
+                    ADD COLUMN points INTEGER NOT NULL DEFAULT 0
+                """)
+
+            if "ads_watched_count" not in columns:
+                cursor.execute("""
+                    ALTER TABLE users
+                    ADD COLUMN ads_watched_count INTEGER NOT NULL DEFAULT 0
+                """)
+
+            if "last_ad_time" not in columns:
+                cursor.execute("""
+                    ALTER TABLE users
+                    ADD COLUMN last_ad_time TEXT
+                """)
+
+            if "is_admin" not in columns:
+                cursor.execute("""
+                    ALTER TABLE users
+                    ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0
+                """)
 
         conn.commit()
         app.logger.info("Database initialized successfully.")
@@ -346,9 +393,7 @@ def watch_ad():
             )
             return redirect(url_for("dashboard"))
 
-        # This timestamp alone does not prove an ad was completed.
         session["ad_page_opened_at"] = time.time()
-
         return render_template("watch_ad.html")
 
     except Exception:
@@ -362,7 +407,6 @@ def claim_reward():
     if "user_id" not in session:
         return redirect(url_for("login"))
 
-    # Basic delay against instant claims; this is NOT ad-provider verification.
     opened_at = session.get("ad_page_opened_at")
 
     if opened_at is None or time.time() - opened_at < 10:
@@ -377,9 +421,7 @@ def claim_reward():
         cursor = conn.cursor()
         user_id = session["user_id"]
         now = datetime.now()
-        placeholder = "%s" if DATABASE_URL else "?"
 
-        # Lock the PostgreSQL user row to avoid simultaneous claims.
         if DATABASE_URL:
             cursor.execute(
                 "SELECT points, ads_watched_count, last_ad_time "
@@ -489,7 +531,6 @@ def withdraw():
                 "error"
             )
         else:
-            # A real payout system has not been connected yet.
             flash(
                 "You meet the minimum balance. Payout processing is not "
                 "configured yet, so no withdrawal has been submitted.",
@@ -515,11 +556,13 @@ def logout():
     return redirect(url_for("login"))
 
 
+# Run database setup during startup, including under Gunicorn on Render.
+init_db()
+
+
 if __name__ == "__main__":
-    init_db()
     app.run(
         host="0.0.0.0",
         port=int(os.environ.get("PORT", 5000)),
         debug=False
-        )
-            
+    )
