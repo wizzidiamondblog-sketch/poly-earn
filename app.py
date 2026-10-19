@@ -2,9 +2,7 @@ import os
 import random
 import string
 import sqlite3
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import requests
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -41,41 +39,34 @@ def init_db():
 init_db()
 
 def send_verification_email(recipient_email, code):
-    sender_email = os.environ.get('SENDER_EMAIL')
-    sender_password = os.environ.get('SENDER_PASSWORD')
+    resend_api_key = os.environ.get('RESEND_API_KEY')
 
-    if not sender_email or not sender_password:
-        print("SENDER_EMAIL or SENDER_PASSWORD not configured in environment variables.")
+    if not resend_api_key:
+        print("RESEND_API_KEY not configured in environment variables.")
         return False
 
     try:
-        msg = MIMEMultipart()
-        msg['From'] = f"Poly Earn <{sender_email}>"
-        msg['To'] = recipient_email
-        msg['Subject'] = 'Poly Earn - Email Verification Code'
+        url = "https://api.resend.com/emails"
+        headers = {
+            "Authorization": f"Bearer {resend_api_key}",
+            "Content-Type": "application/json"
+        }
+        data = {
+            "from": "Poly Earn <onboarding@resend.dev>",
+            "to": [recipient_email],
+            "subject": "Poly Earn - Email Verification Code",
+            "html": f"<p>Hello,</p><p>Thank you for signing up on Poly Earn!</p><p>Your 6-digit email verification code is: <b>{code}</b></p><p>Best regards,<br>Poly Earn Team</p>"
+        }
 
-        body = f"""Hello,
-
-Thank you for signing up on Poly Earn!
-
-Your 6-digit email verification code is: {code}
-
-Please enter this code on the verification page to activate your account.
-
-Best regards,
-Poly Earn Team"""
-
-        msg.attach(MIMEText(body, 'plain'))
-
-        # Connect using SSL port 465 with strict 5-second timeout to prevent Gunicorn crashes
-        server = smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=5)
-        server.login(sender_email, sender_password)
-        server.sendmail(sender_email, recipient_email, msg.as_string())
-        server.quit()
-        print(f"Verification email sent to {recipient_email}")
-        return True
+        response = requests.post(url, json=data, headers=headers, timeout=5)
+        if response.status_code == 200:
+            print(f"Verification email sent to {recipient_email}")
+            return True
+        else:
+            print(f"Resend Error: {response.text}")
+            return False
     except Exception as e:
-        print(f"SMTP Error during email send: {e}")
+        print(f"HTTP Error during email send: {e}")
         return False
 
 @app.route('/')
@@ -123,7 +114,6 @@ def register():
         conn.commit()
         conn.close()
 
-        # Send mail in background attempt
         send_verification_email(email, code)
 
         session['pending_email'] = email
@@ -271,3 +261,4 @@ def logout():
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
+        
