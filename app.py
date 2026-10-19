@@ -154,3 +154,7 @@ def logout():
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
+@app.route('/watch-ad')
+def watch_ad():
+    return render_template('watch_ad.html')
+    
