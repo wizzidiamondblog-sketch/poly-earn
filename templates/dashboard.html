@@ -10,9 +10,7 @@
 
   <!-- Top Navigation / Header -->
   <div class="flex justify-between items-center px-4 py-3 bg-[#0b0e14]/90 backdrop-blur border-b border-slate-800/60 sticky top-0 z-50">
-    <div class="flex items-center space-x-2">
-      <span class="text-base font-black tracking-wide bg-gradient-to-r from-purple-400 to-indigo-400 bg-clip-text text-transparent">Poly Earn</span>
-    </div>
+    <span class="text-base font-black tracking-wide bg-gradient-to-r from-purple-400 to-indigo-400 bg-clip-text text-transparent">Poly Earn</span>
     <div class="flex items-center space-x-3">
       <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
         <span class="w-1.5 h-1.5 mr-1 bg-emerald-400 rounded-full animate-pulse"></span> Online
@@ -51,17 +49,14 @@
       </div>
     </div>
 
-    <!-- YOUR XP / BALANCE CARD (Top Priority Position) -->
+    <!-- YOUR POLY POINTS BALANCE CARD (4K Points = $20 Rate) -->
     <div class="bg-gradient-to-br from-[#1a1f2c] via-[#151922] to-[#11141c] border border-purple-500/30 rounded-3xl p-5 relative overflow-hidden shadow-xl">
-      <div class="absolute -right-6 -bottom-6 opacity-10 pointer-events-none">
-        <svg class="w-44 h-44 text-purple-400" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-      </div>
-      <p class="text-xs font-bold uppercase tracking-wider text-slate-400">YOUR TOTAL XP</p>
+      <p class="text-xs font-bold uppercase tracking-wider text-slate-400">YOUR POLY POINTS (4K = $20)</p>
       <div class="flex justify-between items-end mt-2">
         <div>
-          <h2 class="text-4xl font-black text-white tracking-tight">{{ points }} <span class="text-2xl font-bold text-purple-400">XP</span></h2>
+          <h2 class="text-4xl font-black text-white tracking-tight">{{ points }} <span class="text-xl font-bold text-purple-400">Points</span></h2>
           <p class="text-xs font-medium text-emerald-400 mt-1 flex items-center">
-            <span class="mr-1">🟢</span> Estimated value active
+            <span class="mr-1">🟢</span> ≈ ${{ usd_value }} USDT <span class="text-[10px] text-slate-400 ml-1">(Min: $30)</span>
           </p>
         </div>
         <div class="w-14 h-14 bg-gradient-to-tr from-purple-600 to-indigo-500 rounded-2xl flex items-center justify-center shadow-lg shadow-purple-600/30">
@@ -70,70 +65,26 @@
       </div>
     </div>
 
-    <!-- Primary Action: Watch Ad & Earn (The Green Pill Feature) -->
-    <div class="space-y-2">
-      <a href="/watch-ad" class="block w-full py-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-center font-bold rounded-2xl text-white transition-all shadow-lg shadow-emerald-600/30 flex items-center justify-center space-x-2">
-        <span class="text-lg">▶</span>
-        <span>Watch Ad & Earn (+10 Points)</span>
+    <!-- Actions: Watch Ad & Redeem Page Link -->
+    <div class="grid grid-cols-2 gap-3">
+      <a href="/watch-ad" class="py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-center font-bold rounded-2xl text-white transition-all shadow-lg shadow-emerald-600/30 flex items-center justify-center space-x-1.5 text-xs">
+        <span>▶ Watch Ad</span>
+      </a>
+      <a href="/redeem" class="py-3.5 bg-[#151922] border border-slate-700 hover:bg-slate-800 rounded-2xl font-bold text-xs text-center text-slate-200 shadow-md transition flex items-center justify-center space-x-1">
+        <span>💳 Redeem ($30 Min)</span>
       </a>
     </div>
 
-    <!-- Stats Quick Grid -->
-    <div class="grid grid-cols-3 gap-3">
-      <div class="bg-[#151922] border border-slate-800/80 rounded-2xl p-3 text-center">
-        <p class="text-[11px] text-slate-400 font-medium">Tasks Done</p>
-        <p class="text-base font-bold text-white mt-1">1/19</p>
+    <!-- Ad Tracker Status (25 Ads per 2 hrs) -->
+    <div class="bg-[#151922] border border-slate-800/80 rounded-2xl p-4 flex justify-between items-center">
+      <div>
+        <p class="text-xs text-slate-400 font-medium">Ads Status (Every 2 Hours)</p>
+        <p class="text-sm font-bold text-white mt-0.5">{{ ads_watched }}/25 completed</p>
       </div>
-      <div class="bg-[#151922] border border-slate-800/80 rounded-2xl p-3 text-center">
-        <p class="text-[11px] text-slate-400 font-medium">Daily Streak</p>
-        <p class="text-base font-bold text-orange-400 mt-1">🔥 1 Day</p>
-      </div>
-      <div class="bg-[#151922] border border-slate-800/80 rounded-2xl p-3 text-center">
-        <p class="text-[11px] text-slate-400 font-medium">Referrals</p>
-        <p class="text-base font-bold text-white mt-1">0</p>
-      </div>
-    </div>
-
-    <!-- Daily Check-in Widget -->
-    <div class="bg-[#151922] border border-slate-800/80 rounded-3xl p-4 space-y-3">
-      <div class="flex justify-between items-center">
-        <div>
-          <h4 class="font-bold text-sm text-white flex items-center">🔥 Daily Check-in</h4>
-          <p class="text-xs text-slate-400">Claim your daily reward</p>
-        </div>
-        <button onclick="alert('Checked in successfully!')" class="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs rounded-xl shadow-md transition">
-          Check In
-        </button>
-      </div>
-      <div class="grid grid-cols-7 gap-1.5 pt-1">
-        <div class="bg-purple-600/30 border border-purple-500 rounded-xl p-1.5 text-center">
-          <p class="text-[10px] text-purple-300 font-bold">D1</p>
-          <p class="text-[10px] text-white font-extrabold mt-0.5">10</p>
-        </div>
-        <div class="bg-slate-800/60 border border-slate-700/40 rounded-xl p-1.5 text-center opacity-60">
-          <p class="text-[10px] text-slate-400 font-bold">D2</p>
-          <p class="text-[10px] text-white font-extrabold mt-0.5">15</p>
-        </div>
-        <div class="bg-slate-800/60 border border-slate-700/40 rounded-xl p-1.5 text-center opacity-60">
-          <p class="text-[10px] text-slate-400 font-bold">D3</p>
-          <p class="text-[10px] text-white font-extrabold mt-0.5">20</p>
-        </div>
-        <div class="bg-slate-800/60 border border-slate-700/40 rounded-xl p-1.5 text-center opacity-60">
-          <p class="text-[10px] text-slate-400 font-bold">D4</p>
-          <p class="text-[10px] text-white font-extrabold mt-0.5">30</p>
-        </div>
-        <div class="bg-slate-800/60 border border-slate-700/40 rounded-xl p-1.5 text-center opacity-60">
-          <p class="text-[10px] text-slate-400 font-bold">D5</p>
-          <p class="text-[10px] text-white font-extrabold mt-0.5">40</p>
-        </div>
-        <div class="bg-slate-800/60 border border-slate-700/40 rounded-xl p-1.5 text-center opacity-60">
-          <p class="text-[10px] text-slate-400 font-bold">D6</p>
-          <p class="text-[10px] text-white font-extrabold mt-0.5">50</p>
-        </div>
-        <div class="bg-slate-800/60 border border-slate-700/40 rounded-xl p-1.5 text-center opacity-60">
-          <p class="text-[10px] text-slate-400 font-bold">D7</p>
-          <p class="text-[10px] text-white font-extrabold mt-0.5">100</p>
-        </div>
+      <div class="text-right">
+        <span class="text-xs font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2.5 py-1 rounded-xl">
+          {{ 25 - ads_watched }} left
+        </span>
       </div>
     </div>
 
@@ -155,9 +106,9 @@
       </a>
       <span class="text-[10px] text-amber-400 font-bold mt-0.5">Play</span>
     </div>
-    <a href="#" onclick="alert('Referral section coming soon!')" class="flex flex-col items-center text-slate-400 hover:text-white">
+    <a href="/redeem" class="flex flex-col items-center text-slate-400 hover:text-white">
       <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"/></svg>
-      <span class="text-[10px] mt-1">Refer</span>
+      <span class="text-[10px] mt-1">Redeem</span>
     </a>
     <a href="/logout" class="flex flex-col items-center text-slate-400 hover:text-white">
       <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
@@ -167,4 +118,4 @@
 
 </body>
   </html>
-          
+            
