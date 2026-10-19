@@ -8,7 +8,7 @@
 </head>
 <body class="bg-[#0b0e14] text-white min-h-screen flex flex-col justify-between p-6 select-none">
 
-  <!-- Top Bar: Back & Timer -->
+  <!-- Top Navigation -->
   <div class="max-w-md w-full mx-auto flex justify-between items-center">
     <a href="/dashboard" class="w-10 h-10 bg-slate-800 border border-slate-700 rounded-full flex items-center justify-center text-white font-bold text-lg hover:bg-slate-700 transition">
       ✕
@@ -27,7 +27,7 @@
 
     <div class="space-y-2">
       <h2 id="status-heading" class="text-xl font-black text-white">Ad In Progress...</h2>
-      <p id="status-text" class="text-xs text-slate-400">Please wait 20 seconds. Your +100 Poly Points will be added automatically!</p>
+      <p id="status-text" class="text-xs text-slate-400">Please wait 20 seconds. Your +3 Poly Points will be added automatically!</p>
     </div>
 
     <!-- Live Timer Display -->
@@ -36,13 +36,13 @@
       <p class="text-xs text-slate-500 mt-2">Seconds remaining...</p>
     </div>
 
-    <!-- Auto Crediting Status Indicator -->
+    <!-- Auto Crediting Status -->
     <div id="crediting-box" class="hidden py-4 space-y-2">
       <div class="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-      <p class="text-sm font-bold text-emerald-400">Crediting +100 Poly Points to your account...</p>
+      <p class="text-sm font-bold text-emerald-400">Crediting +3 Poly Points to your account...</p>
     </div>
 
-    <!-- Hidden Claim Form (Submitted Automatically by JS) -->
+    <!-- Hidden Claim Form (Triggered automatically by Javascript) -->
     <form id="auto-claim-form" action="/claim-reward" method="POST" class="hidden"></form>
 
     <!-- Backup Direct Re-Open Link -->
@@ -70,22 +70,22 @@
       if (timeLeft <= 0) {
         clearInterval(downloadTimer);
         
-        // Update UI to Auto-Crediting State
+        // Show crediting screen
         document.getElementById('timer-box').classList.add('hidden');
         document.getElementById('reopen-box').classList.add('hidden');
         document.getElementById('crediting-box').classList.remove('hidden');
         
         document.getElementById('status-heading').innerText = "Crediting Points! 🎉";
-        document.getElementById('status-text').innerText = "Redirecting back to dashboard...";
+        document.getElementById('status-text').innerText = "Updating your balance...";
         
         badge.classList.replace('bg-purple-600/20', 'bg-emerald-600/20');
         badge.classList.replace('text-purple-300', 'text-emerald-400');
         badge.innerText = "DONE!";
 
-        // AUTO-SUBMIT the form to credit points automatically
+        // Auto submit form to add points to balance in PostgreSQL
         setTimeout(function() {
           document.getElementById('auto-claim-form').submit();
-        }, 800);
+        }, 500);
       }
     }, 1000);
   </script>
