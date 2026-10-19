@@ -148,14 +148,27 @@ def dashboard():
         cursor = conn.cursor()
         
         if DATABASE_URL:
-            cursor.execute("SELECT points, ads_watched_count FROM users WHERE id = %s", (session['user_id'],))
+            cursor.execute("SELECT points, ads_watched_count, last_ad_time FROM users WHERE id = %s", (session['user_id'],))
         else:
-            cursor.execute("SELECT points, ads_watched_count FROM users WHERE id = ?", (session['user_id'],))
+            cursor.execute("SELECT points, ads_watched_count, last_ad_time FROM users WHERE id = ?", (session['user_id'],))
             
         row = cursor.fetchone()
         if row:
             points = row[0]
             ads_watched = row[1] if row[1] else 0
+            last_time = row[2]
+            
+            # Check if 2 hours passed since last ad reset window
+            if last_time:
+                if isinstance(last_time, str):
+                    last_time = datetime.strptime(last_time, '%Y-%m-%d %H:%M:%S.%f' if '.' in last_time else '%Y-%m-%d %H:%M:%S')
+                if datetime.now() - last_time > timedelta(hours=2):
+                    if DATABASE_URL:
+                        cursor.execute("UPDATE users SET ads_watched_count = 0 WHERE id = %s", (session['user_id'],))
+                    else:
+                        cursor.execute("UPDATE users SET ads_watched_count = 0 WHERE id = ?", (session['user_id'],))
+                    conn.commit()
+                    ads_watched = 0
             
         cursor.close()
         conn.close()
@@ -163,7 +176,7 @@ def dashboard():
         points = 0
     
     # Calculate USD value based on 4,000 points = $20 (1 point = $0.005)
-    usd_value = round(points * (20 / 4000), 4)
+    usd_value = round(points * (20 / 4000), 2)
     
     return render_template('dashboard.html', username=session.get('username', 'User'), points=points, usd_value=usd_value, ads_watched=ads_watched)
 
@@ -200,7 +213,6 @@ def watch_ad():
                 conn.commit()
                 cursor.close()
                 conn.close()
-                ads_watched = 0
             else:
                 ads_watched = row[0]
                 if ads_watched >= 25:
@@ -209,12 +221,21 @@ def watch_ad():
     except Exception as e:
         pass
         
+    # Store exact start time for timer security validation
+    session['ad_start_time'] = datetime.now().timestamp()
     return render_template('watch_ad.html')
 
 @app.route('/claim-reward', methods=['POST'])
 def claim_reward():
     if 'user_id' not in session:
         return redirect(url_for('login'))
+        
+    start_time = session.get('ad_start_time')
+    
+    # Verify at least 18 seconds passed on server clock before crediting
+    if not start_time or (datetime.now().timestamp() - start_time) < 18:
+        flash("Failed to claim reward. Please wait the full 20 seconds.", "error")
+        return redirect(url_for('dashboard'))
         
     try:
         conn = get_db()
@@ -223,19 +244,23 @@ def claim_reward():
         now = datetime.now()
         if DATABASE_URL:
             cursor.execute(
-                "UPDATE users SET points = points + 100, ads_watched_count = ads_watched_count + 1, last_ad_time = %s WHERE id = %s",
+                "UPDATE users SET points = points + 3, ads_watched_count = ads_watched_count + 1, last_ad_time = %s WHERE id = %s",
                 (now, session['user_id'])
             )
         else:
             cursor.execute(
-                "UPDATE users SET points = points + 100, ads_watched_count = ads_watched_count + 1, last_ad_time = ? WHERE id = ?",
+                "UPDATE users SET points = points + 3, ads_watched_count = ads_watched_count + 1, last_ad_time = ? WHERE id = ?",
                 (str(now), session['user_id'])
             )
             
         conn.commit()
         cursor.close()
         conn.close()
-        flash("Ad completed! +100 XP added to your balance.", "success")
+        
+        # Clear start timestamp so it can't be re-submitted
+        session.pop('ad_start_time', None)
+        
+        flash("🎉 +3 Poly Points added to your balance!", "success")
     except Exception as e:
         flash("Failed to claim reward. Try again.", "error")
         
@@ -261,7 +286,7 @@ def withdraw():
         min_points_for_30_usd = int(30 * (4000 / 20)) # 6,000 points = $30
         
         if points < min_points_for_30_usd:
-            flash(f"Minimum withdrawal is $30 ({min_points_for_30_usd} XP). You currently have {points} XP.", "error")
+            flash(f"Minimum withdrawal is $30 ({min_points_for_30_usd} Poly Points). You currently have {points} Points.", "error")
         else:
             flash("Withdrawal request submitted successfully! Processing payout...", "success")
     except Exception as e:
