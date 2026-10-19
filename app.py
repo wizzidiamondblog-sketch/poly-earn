@@ -1,7 +1,7 @@
 import os
 import sqlite3
 import psycopg2
-import traceback
+from datetime import datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -25,6 +25,7 @@ def init_db():
     try:
         conn = get_db()
         cursor = conn.cursor()
+        
         if DATABASE_URL:
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS users (
@@ -33,6 +34,8 @@ def init_db():
                     email VARCHAR(120) UNIQUE NOT NULL,
                     password TEXT NOT NULL,
                     points INT DEFAULT 0,
+                    ads_watched_count INT DEFAULT 0,
+                    last_ad_time TIMESTAMP,
                     is_admin BOOLEAN DEFAULT FALSE
                 );
             ''')
@@ -44,14 +47,17 @@ def init_db():
                     email TEXT UNIQUE NOT NULL,
                     password TEXT NOT NULL,
                     points INTEGER DEFAULT 0,
+                    ads_watched_count INTEGER DEFAULT 0,
+                    last_ad_time TEXT,
                     is_admin INTEGER DEFAULT 0
                 );
             ''')
+        
         conn.commit()
         cursor.close()
         conn.close()
     except Exception as e:
-        print(f"Init DB Error: {e}")
+        print(f"Database Init Error: {e}")
 
 init_db()
 
@@ -126,7 +132,7 @@ def login():
             
             flash("Invalid email or password!", "error")
         except Exception as e:
-            flash(f"Login error: {str(e)}", "error")
+            flash("Login error occurred.", "error")
             
     return render_template('login.html')
 
@@ -135,29 +141,74 @@ def dashboard():
     if 'user_id' not in session:
         return redirect(url_for('login'))
         
+    points = 0
+    ads_watched = 0
     try:
         conn = get_db()
         cursor = conn.cursor()
         
         if DATABASE_URL:
-            cursor.execute("SELECT points FROM users WHERE id = %s", (session['user_id'],))
+            cursor.execute("SELECT points, ads_watched_count FROM users WHERE id = %s", (session['user_id'],))
         else:
-            cursor.execute("SELECT points FROM users WHERE id = ?", (session['user_id'],))
+            cursor.execute("SELECT points, ads_watched_count FROM users WHERE id = ?", (session['user_id'],))
             
         row = cursor.fetchone()
-        points = row[0] if row else 0
+        if row:
+            points = row[0]
+            ads_watched = row[1] if row[1] else 0
             
         cursor.close()
         conn.close()
-        
-        return render_template('dashboard.html', username=session.get('username', 'User'), points=points)
     except Exception as e:
-        return f"<h1>Dashboard Crash Error:</h1><pre>{traceback.format_exc()}</pre>"
+        points = 0
+    
+    # Calculate USD value based on 4,000 points = $20 (1 point = $0.005)
+    usd_value = round(points * (20 / 4000), 4)
+    
+    return render_template('dashboard.html', username=session.get('username', 'User'), points=points, usd_value=usd_value, ads_watched=ads_watched)
 
 @app.route('/watch-ad')
 def watch_ad():
     if 'user_id' not in session:
         return redirect(url_for('login'))
+        
+    # Check 25 ads per 2 hours limit
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        if DATABASE_URL:
+            cursor.execute("SELECT ads_watched_count, last_ad_time FROM users WHERE id = %s", (session['user_id'],))
+        else:
+            cursor.execute("SELECT ads_watched_count, last_ad_time FROM users WHERE id = ?", (session['user_id'],))
+        row = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        
+        if row and row[1]:
+            last_time = row[1]
+            if isinstance(last_time, str):
+                last_time = datetime.strptime(last_time, '%Y-%m-%d %H:%M:%S.%f' if '.' in last_time else '%Y-%m-%d %H:%M:%S')
+            
+            # If 2 hours have passed, reset the ad count
+            if datetime.now() - last_time > timedelta(hours=2):
+                conn = get_db()
+                cursor = conn.cursor()
+                if DATABASE_URL:
+                    cursor.execute("UPDATE users SET ads_watched_count = 0 WHERE id = %s", (session['user_id'],))
+                else:
+                    cursor.execute("UPDATE users SET ads_watched_count = 0 WHERE id = ?", (session['user_id'],))
+                conn.commit()
+                cursor.close()
+                conn.close()
+                ads_watched = 0
+            else:
+                ads_watched = row[0]
+                if ads_watched >= 25:
+                    flash("You have reached your limit of 25 ads for this 2-hour window. Please wait for reset!", "error")
+                    return redirect(url_for('dashboard'))
+    except Exception as e:
+        pass
+        
     return render_template('watch_ad.html')
 
 @app.route('/claim-reward', methods=['POST'])
@@ -169,17 +220,52 @@ def claim_reward():
         conn = get_db()
         cursor = conn.cursor()
         
+        now = datetime.now()
         if DATABASE_URL:
-            cursor.execute("UPDATE users SET points = points + 10 WHERE id = %s", (session['user_id'],))
+            cursor.execute(
+                "UPDATE users SET points = points + 100, ads_watched_count = ads_watched_count + 1, last_ad_time = %s WHERE id = %s",
+                (now, session['user_id'])
+            )
         else:
-            cursor.execute("UPDATE users SET points = points + 10 WHERE id = ?", (session['user_id'],))
+            cursor.execute(
+                "UPDATE users SET points = points + 100, ads_watched_count = ads_watched_count + 1, last_ad_time = ? WHERE id = ?",
+                (str(now), session['user_id'])
+            )
             
         conn.commit()
         cursor.close()
         conn.close()
-        flash("Reward claimed! +10 Points added.", "success")
+        flash("Ad completed! +100 XP added to your balance.", "success")
     except Exception as e:
-        flash("Failed to claim reward.", "error")
+        flash("Failed to claim reward. Try again.", "error")
+        
+    return redirect(url_for('dashboard'))
+
+@app.route('/withdraw', methods=['POST'])
+def withdraw():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+        
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        if DATABASE_URL:
+            cursor.execute("SELECT points FROM users WHERE id = %s", (session['user_id'],))
+        else:
+            cursor.execute("SELECT points FROM users WHERE id = ?", (session['user_id'],))
+        row = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        
+        points = row[0] if row else 0
+        min_points_for_30_usd = int(30 * (4000 / 20)) # 6,000 points = $30
+        
+        if points < min_points_for_30_usd:
+            flash(f"Minimum withdrawal is $30 ({min_points_for_30_usd} XP). You currently have {points} XP.", "error")
+        else:
+            flash("Withdrawal request submitted successfully! Processing payout...", "success")
+    except Exception as e:
+        flash("Withdrawal error occurred.", "error")
         
     return redirect(url_for('dashboard'))
 
@@ -190,4 +276,4 @@ def logout():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
-        
+                    
