@@ -1,144 +1,84 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Poly Earn - Admin Control Panel</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Poly Earn Admin</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 18px; background: #f3f5f8; color: #222; }
+        h1, h2 { color: #173b2b; }
+        .card { background: white; padding: 15px; margin: 16px 0; border-radius: 12px; overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; min-width: 600px; }
+        th, td { padding: 10px; border-bottom: 1px solid #ddd; text-align: left; }
+        th { background: #e8f2ec; }
+        button { padding: 8px 12px; border: 0; border-radius: 6px; cursor: pointer; margin: 3px; }
+        .approve { background: #167c45; color: white; }
+        .reject { background: #b42318; color: white; }
+        .status { font-weight: bold; }
+        a { color: #167c45; }
+    </style>
 </head>
-<body class="bg-slate-950 text-white min-h-screen font-sans pb-12">
+<body>
+    <h1>Poly Earn Admin</h1>
+    <p><a href="{{ url_for('dashboard') }}">Back to user dashboard</a> |
+       <a href="{{ url_for('logout') }}">Log out</a></p>
 
-    <!-- Top Navigation -->
-    <nav class="flex justify-between items-center px-6 py-4 border-b border-slate-800 bg-slate-900/60 backdrop-blur-md sticky top-0 z-50">
-        <h1 class="text-xl font-extrabold text-amber-400 tracking-wide flex items-center gap-2">
-            🛡️ Admin Control Panel
-        </h1>
-        <a href="/dashboard" class="text-xs bg-slate-800 text-gray-300 hover:bg-slate-700 px-3 py-2 rounded-xl border border-slate-700 font-semibold transition">Back to User Dashboard</a>
-    </nav>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <p>{{ message }}</p>
+      {% endfor %}
+    {% endwith %}
 
-    <div class="max-w-4xl mx-auto px-4 mt-6 space-y-6">
-
-        <!-- STATS OVERVIEW -->
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div class="bg-slate-900/80 border border-slate-800 p-4 rounded-xl">
-                <p class="text-[10px] text-gray-400 uppercase font-semibold">Total Users</p>
-                <p class="text-2xl font-black text-emerald-400 mt-1">{{ total_users }}</p>
-            </div>
-            <div class="bg-slate-900/80 border border-slate-800 p-4 rounded-xl">
-                <p class="text-[10px] text-gray-400 uppercase font-semibold">Total Points Earned</p>
-                <p class="text-2xl font-black text-indigo-400 mt-1">{{ total_points_earned }} Pts</p>
-            </div>
-            <div class="bg-slate-900/80 border border-slate-800 p-4 rounded-xl">
-                <p class="text-[10px] text-gray-400 uppercase font-semibold">Pending Payouts</p>
-                <p class="text-2xl font-black text-amber-400 mt-1">{{ pending_payouts_count }}</p>
-            </div>
-            <div class="bg-slate-900/80 border border-slate-800 p-4 rounded-xl">
-                <p class="text-[10px] text-gray-400 uppercase font-semibold">Approved Payouts</p>
-                <p class="text-2xl font-black text-emerald-400 mt-1">${{ total_approved_usdt }} USDT</p>
-            </div>
-        </div>
-
-        <!-- PAYOUT MANAGEMENT TABLE -->
-        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-            <h2 class="text-base font-bold text-gray-100 flex items-center gap-2">
-                💳 Withdrawal Requests Management
-            </h2>
-
-            <div class="overflow-x-auto">
-                <table class="w-full text-left text-xs text-gray-300">
-                    <thead class="bg-slate-950 text-gray-400 uppercase font-bold border-b border-slate-800 text-[10px]">
-                        <tr>
-                            <th class="p-3">User</th>
-                            <th class="p-3">USDT / Points</th>
-                            <th class="p-3">Polygon Wallet Address</th>
-                            <th class="p-3">Status</th>
-                            <th class="p-3">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-800/60">
-                        {% for p in payouts %}
-                        <tr class="hover:bg-slate-800/30">
-                            <td class="p-3 font-semibold text-white">@{{ p.username }}</td>
-                            <td class="p-3">
-                                <span class="text-emerald-400 font-bold">${{ p.usdt_amount }} USDT</span>
-                                <span class="text-[10px] text-gray-500 block">({{ p.points_deducted }} Pts)</span>
-                            </td>
-                            <td class="p-3 font-mono text-[11px] text-gray-300 select-all">{{ p.wallet_address }}</td>
-                            <td class="p-3">
-                                <span class="px-2.5 py-1 rounded-lg font-bold text-[10px] 
-                                    {% if p.status == 'Approved' %}bg-emerald-500/20 text-emerald-400
-                                    {% elif p.status == 'Declined' %}bg-rose-500/20 text-rose-400
-                                    {% else %}bg-amber-500/20 text-amber-400{% endif %}">
-                                    {{ p.status }}
-                                </span>
-                            </td>
-                            <td class="p-3">
-                                {% if p.status == 'Pending' %}
-                                <div class="flex gap-2">
-                                    <button onclick="updatePayout({{ p.id }}, 'Approved')" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-2.5 py-1 rounded-lg transition">Approve</button>
-                                    <button onclick="updatePayout({{ p.id }}, 'Declined')" class="bg-rose-600 hover:bg-rose-500 text-white font-bold px-2.5 py-1 rounded-lg transition">Decline</button>
-                                </div>
-                                {% else %}
-                                <span class="text-gray-500 text-[10px] italic">Completed</span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% else %}
-                        <tr>
-                            <td colspan="5" class="p-4 text-center text-gray-500">No withdrawal requests found.</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- ALL REGISTERED USERS TABLE -->
-        <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-            <h2 class="text-base font-bold text-gray-100">👥 User Directory & Balances</h2>
-            <div class="overflow-x-auto">
-                <table class="w-full text-left text-xs text-gray-300">
-                    <thead class="bg-slate-950 text-gray-400 uppercase font-bold border-b border-slate-800 text-[10px]">
-                        <tr>
-                            <th class="p-3">Username</th>
-                            <th class="p-3">Available Points</th>
-                            <th class="p-3">USDT Value</th>
-                            <th class="p-3">Ads Watched</th>
-                            <th class="p-3">Ref Code</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-800/60">
-                        {% for u in users %}
-                        <tr class="hover:bg-slate-800/30">
-                            <td class="p-3 font-bold text-white">@{{ u.username }}</td>
-                            <td class="p-3 text-emerald-400 font-bold">{{ u.points }} Pts</td>
-                            <td class="p-3 font-semibold text-white">${{ (u.points * 0.005) | round(2) }}</td>
-                            <td class="p-3">{{ u.ads_watched }} / 25</td>
-                            <td class="p-3 font-mono text-[10px] text-gray-400">{{ u.ref_code }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
+    <div class="card">
+        <h2>Registered Users ({{ users|length }})</h2>
+        <table>
+            <tr><th>ID</th><th>Username</th><th>Email</th><th>Points</th></tr>
+            {% for user in users %}
+            <tr>
+                <td>{{ user[0] }}</td>
+                <td>{{ user[1] }}</td>
+                <td>{{ user[2] }}</td>
+                <td>{{ user[3] }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4">No users found.</td></tr>
+            {% endfor %}
+        </table>
     </div>
 
-    <script>
-        function updatePayout(payoutId, status) {
-            if(!confirm(`Are you sure you want to mark this payout as ${status}?`)) return;
-
-            fetch('/admin/update-payout', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ payout_id: payoutId, status: status })
-            })
-            .then(res => res.json())
-            .then(data => {
-                alert(data.message);
-                if(data.success) location.reload();
-            });
-        }
-    </script>
+    <div class="card">
+        <h2>Withdrawal Requests ({{ withdrawals|length }})</h2>
+        <table>
+            <tr>
+                <th>ID</th><th>User</th><th>Email</th><th>Points</th>
+                <th>Status</th><th>Requested</th><th>Action</th>
+            </tr>
+            {% for item in withdrawals %}
+            <tr>
+                <td>{{ item[0] }}</td>
+                <td>{{ item[1] }}</td>
+                <td>{{ item[2] }}</td>
+                <td>{{ item[3] }}</td>
+                <td class="status">{{ item[4] }}</td>
+                <td>{{ item[5] }}</td>
+                <td>
+                    {% if item[4] == 'pending' %}
+                    <form method="POST" action="{{ url_for('process_withdrawal', withdrawal_id=item[0], action='approve') }}">
+                        <button class="approve" type="submit">Approve</button>
+                    </form>
+                    <form method="POST" action="{{ url_for('process_withdrawal', withdrawal_id=item[0], action='reject') }}">
+                        <button class="reject" type="submit">Reject</button>
+                    </form>
+                    {% else %}
+                    Processed
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7">No withdrawal requests yet.</td></tr>
+            {% endfor %}
+        </table>
+    </div>
 </body>
 </html>
