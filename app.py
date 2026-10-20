@@ -6,27 +6,17 @@ import logging
 import psycopg2
 
 from datetime import datetime, timedelta
-from flask import (
-    Flask, render_template, request, redirect,
-    url_for, session, flash
-)
+from flask import Flask, render_template, request, redirect, url_for, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
-
-app.secret_key = os.environ.get("SECRET_KEY")
-if not app.secret_key:
-    app.secret_key = os.urandom(32)
-    app.logger.warning(
-        "SECRET_KEY is not configured. Set it in Render for persistent sessions."
-    )
+app.secret_key = os.environ.get("SECRET_KEY") or os.urandom(32)
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace(
-        "postgres://", "postgresql://", 1
-    )
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
+ADMIN_EMAIL = (os.environ.get("ADMIN_EMAIL") or "").strip().lower()
 MAX_ADS = 25
 AD_WINDOW = timedelta(hours=2)
 POINTS_PER_AD = 3
@@ -37,25 +27,16 @@ logging.basicConfig(level=logging.INFO)
 
 def get_db():
     if DATABASE_URL:
-        return psycopg2.connect(
-            DATABASE_URL,
-            sslmode="require",
-            connect_timeout=10
-        )
-
+        return psycopg2.connect(DATABASE_URL, sslmode="require", connect_timeout=10)
     conn = sqlite3.connect("poly_earn.db", timeout=15)
     conn.row_factory = sqlite3.Row
     return conn
 
 
 def init_db():
-    conn = None
-    cursor = None
-
+    conn = get_db()
+    cursor = conn.cursor()
     try:
-        conn = get_db()
-        cursor = conn.cursor()
-
         if DATABASE_URL:
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS users (
@@ -69,25 +50,20 @@ def init_db():
                     is_admin BOOLEAN NOT NULL DEFAULT FALSE
                 )
             """)
-
-            # Add missing columns to an existing PostgreSQL table.
+            cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS points INTEGER NOT NULL DEFAULT 0")
+            cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS ads_watched_count INTEGER NOT NULL DEFAULT 0")
+            cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_ad_time TIMESTAMP")
+            cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE")
             cursor.execute("""
-                ALTER TABLE users
-                ADD COLUMN IF NOT EXISTS ads_watched_count
-                INTEGER NOT NULL DEFAULT 0
+                CREATE TABLE IF NOT EXISTS withdrawals (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER NOT NULL REFERENCES users(id),
+                    points INTEGER NOT NULL,
+                    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    processed_at TIMESTAMP
+                )
             """)
-
-            cursor.execute("""
-                ALTER TABLE users
-                ADD COLUMN IF NOT EXISTS last_ad_time TIMESTAMP
-            """)
-
-            cursor.execute("""
-                ALTER TABLE users
-                ADD COLUMN IF NOT EXISTS is_admin
-                BOOLEAN NOT NULL DEFAULT FALSE
-            """)
-
         else:
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS users (
@@ -101,109 +77,87 @@ def init_db():
                     is_admin INTEGER NOT NULL DEFAULT 0
                 )
             """)
-
-            # Add missing columns to an existing SQLite table.
             cursor.execute("PRAGMA table_info(users)")
             columns = {row[1] for row in cursor.fetchall()}
-
-            if "points" not in columns:
-                cursor.execute("""
-                    ALTER TABLE users
-                    ADD COLUMN points INTEGER NOT NULL DEFAULT 0
-                """)
-
-            if "ads_watched_count" not in columns:
-                cursor.execute("""
-                    ALTER TABLE users
-                    ADD COLUMN ads_watched_count INTEGER NOT NULL DEFAULT 0
-                """)
-
-            if "last_ad_time" not in columns:
-                cursor.execute("""
-                    ALTER TABLE users
-                    ADD COLUMN last_ad_time TEXT
-                """)
-
-            if "is_admin" not in columns:
-                cursor.execute("""
-                    ALTER TABLE users
-                    ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0
-                """)
-
+            for name, definition in [
+                ("points", "INTEGER NOT NULL DEFAULT 0"),
+                ("ads_watched_count", "INTEGER NOT NULL DEFAULT 0"),
+                ("last_ad_time", "TEXT"),
+                ("is_admin", "INTEGER NOT NULL DEFAULT 0")
+            ]:
+                if name not in columns:
+                    cursor.execute(f"ALTER TABLE users ADD COLUMN {name} {definition}")
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS withdrawals (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    points INTEGER NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    processed_at TEXT,
+                    FOREIGN KEY (user_id) REFERENCES users(id)
+                )
+            """)
         conn.commit()
-        app.logger.info("Database initialized successfully.")
-
     except Exception:
-        if conn:
-            conn.rollback()
-        app.logger.exception("Database initialization failed.")
+        conn.rollback()
+        app.logger.exception("Database initialization failed")
         raise
-
     finally:
-        if cursor:
-            cursor.close()
-        if conn:
-            conn.close()
+        cursor.close()
+        conn.close()
 
 
 def parse_datetime(value):
     if not value:
         return None
-
     if isinstance(value, datetime):
         return value.replace(tzinfo=None)
-
     return datetime.fromisoformat(str(value))
 
 
-def get_user_ad_status(user_id):
-    conn = None
-    cursor = None
-
+def is_admin_user():
+    if "user_id" not in session or not ADMIN_EMAIL:
+        return False
+    conn = get_db()
+    cursor = conn.cursor()
     try:
-        conn = get_db()
-        cursor = conn.cursor()
+        p = "%s" if DATABASE_URL else "?"
+        cursor.execute(f"SELECT email FROM users WHERE id = {p}", (session["user_id"],))
+        row = cursor.fetchone()
+        return bool(row and row[0].strip().lower() == ADMIN_EMAIL)
+    finally:
+        cursor.close()
+        conn.close()
 
-        placeholder = "%s" if DATABASE_URL else "?"
+
+def get_user_ad_status(user_id):
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        p = "%s" if DATABASE_URL else "?"
         cursor.execute(
-            "SELECT ads_watched_count, last_ad_time "
-            f"FROM users WHERE id = {placeholder}",
+            f"SELECT ads_watched_count, last_ad_time FROM users WHERE id = {p}",
             (user_id,)
         )
-
         row = cursor.fetchone()
-
         if not row:
             return None
-
         count = row[0] or 0
         last_time = parse_datetime(row[1])
-        now = datetime.now()
-
-        if last_time and now - last_time >= AD_WINDOW:
-            cursor.execute(
-                "UPDATE users SET ads_watched_count = 0 "
-                f"WHERE id = {placeholder}",
-                (user_id,)
-            )
+        if last_time and datetime.now() - last_time >= AD_WINDOW:
+            cursor.execute(f"UPDATE users SET ads_watched_count = 0 WHERE id = {p}", (user_id,))
             conn.commit()
-            count = 0
-            last_time = None
-
+            count, last_time = 0, None
         return count, last_time
-
     finally:
-        if cursor:
-            cursor.close()
-        if conn:
-            conn.close()
+        cursor.close()
+        conn.close()
 
 
 @app.route("/")
 def home():
-    if "user_id" in session:
-        return redirect(url_for("dashboard"))
-    return redirect(url_for("login"))
+    return redirect(url_for("dashboard" if "user_id" in session else "login"))
 
 
 @app.route("/register", methods=["GET", "POST"])
@@ -212,60 +166,33 @@ def register():
         username = (request.form.get("username") or "").strip()
         email = (request.form.get("email") or "").strip().lower()
         password = request.form.get("password") or ""
-
         if not username or not email or not password:
             flash("All fields are required.", "error")
             return redirect(url_for("register"))
-
         if len(username) > 80 or len(email) > 120:
             flash("Username or email is too long.", "error")
             return redirect(url_for("register"))
-
         if len(password) < 8:
             flash("Password must be at least 8 characters.", "error")
             return redirect(url_for("register"))
-
-        conn = None
-        cursor = None
-
+        conn = get_db()
+        cursor = conn.cursor()
         try:
-            conn = get_db()
-            cursor = conn.cursor()
-
-            if DATABASE_URL:
-                cursor.execute(
-                    "INSERT INTO users (username, email, password) "
-                    "VALUES (%s, %s, %s)",
-                    (username, email, generate_password_hash(password))
-                )
-            else:
-                cursor.execute(
-                    "INSERT INTO users (username, email, password) "
-                    "VALUES (?, ?, ?)",
-                    (username, email, generate_password_hash(password))
-                )
-
+            p = "%s" if DATABASE_URL else "?"
+            cursor.execute(
+                f"INSERT INTO users (username, email, password) VALUES ({p}, {p}, {p})",
+                (username, email, generate_password_hash(password))
+            )
             conn.commit()
             flash("Registration successful. Please log in.", "success")
             return redirect(url_for("login"))
-
         except Exception:
-            if conn:
-                conn.rollback()
-            app.logger.exception("Registration failed.")
-            flash(
-                "Registration failed. Check whether the username or email "
-                "is already registered.",
-                "error"
-            )
-            return redirect(url_for("register"))
-
+            conn.rollback()
+            app.logger.exception("Registration failed")
+            flash("Registration failed. Username or email may already exist.", "error")
         finally:
-            if cursor:
-                cursor.close()
-            if conn:
-                conn.close()
-
+            cursor.close()
+            conn.close()
     return render_template("register.html")
 
 
@@ -274,40 +201,27 @@ def login():
     if request.method == "POST":
         email = (request.form.get("email") or "").strip().lower()
         password = request.form.get("password") or ""
-
-        conn = None
-        cursor = None
-
+        conn = get_db()
+        cursor = conn.cursor()
         try:
-            conn = get_db()
-            cursor = conn.cursor()
-            placeholder = "%s" if DATABASE_URL else "?"
-
+            p = "%s" if DATABASE_URL else "?"
             cursor.execute(
-                "SELECT id, username, email, password "
-                f"FROM users WHERE email = {placeholder}",
+                f"SELECT id, username, email, password FROM users WHERE email = {p}",
                 (email,)
             )
             user = cursor.fetchone()
-
             if user and check_password_hash(user[3], password):
                 session.clear()
                 session["user_id"] = user[0]
                 session["username"] = user[1]
                 return redirect(url_for("dashboard"))
-
             flash("Invalid email or password.", "error")
-
         except Exception:
-            app.logger.exception("Login failed.")
+            app.logger.exception("Login failed")
             flash("Login error. Please try again.", "error")
-
         finally:
-            if cursor:
-                cursor.close()
-            if conn:
-                conn.close()
-
+            cursor.close()
+            conn.close()
     return render_template("login.html")
 
 
@@ -315,90 +229,57 @@ def login():
 def dashboard():
     if "user_id" not in session:
         return redirect(url_for("login"))
-
-    conn = None
-    cursor = None
-
+    conn = get_db()
+    cursor = conn.cursor()
     try:
-        conn = get_db()
-        cursor = conn.cursor()
-        placeholder = "%s" if DATABASE_URL else "?"
-
+        p = "%s" if DATABASE_URL else "?"
         cursor.execute(
-            "SELECT points, ads_watched_count, last_ad_time "
-            f"FROM users WHERE id = {placeholder}",
+            f"SELECT points, ads_watched_count, last_ad_time FROM users WHERE id = {p}",
             (session["user_id"],)
         )
         row = cursor.fetchone()
-
         if not row:
             session.clear()
-            flash("Account not found. Please log in again.", "error")
             return redirect(url_for("login"))
-
-        points = row[0] or 0
-        ads_watched = row[1] or 0
+        points, count = row[0] or 0, row[1] or 0
         last_time = parse_datetime(row[2])
-
         if last_time and datetime.now() - last_time >= AD_WINDOW:
-            cursor.execute(
-                "UPDATE users SET ads_watched_count = 0 "
-                f"WHERE id = {placeholder}",
-                (session["user_id"],)
-            )
+            cursor.execute(f"UPDATE users SET ads_watched_count = 0 WHERE id = {p}", (session["user_id"],))
             conn.commit()
-            ads_watched = 0
-
-        usd_value = round(points * 0.005, 2)
-
+            count = 0
+        return render_template(
+            "dashboard.html",
+            username=session.get("username", "User"),
+            points=points,
+            usd_value=round(points * 0.005, 2),
+            ads_watched=count
+        )
     except Exception:
-        app.logger.exception("Dashboard loading failed.")
-        flash("Could not load your balance. Please try again.", "error")
+        app.logger.exception("Dashboard failed")
+        flash("Could not load your balance.", "error")
         return redirect(url_for("login"))
-
     finally:
-        if cursor:
-            cursor.close()
-        if conn:
-            conn.close()
-
-    return render_template(
-        "dashboard.html",
-        username=session.get("username", "User"),
-        points=points,
-        usd_value=usd_value,
-        ads_watched=ads_watched
-    )
+        cursor.close()
+        conn.close()
 
 
-@app.route("/watch-ad", methods=["GET"])
+@app.route("/watch-ad")
 def watch_ad():
     if "user_id" not in session:
         return redirect(url_for("login"))
-
     try:
         status = get_user_ad_status(session["user_id"])
-
         if status is None:
             session.clear()
-            flash("Account not found. Please log in again.", "error")
             return redirect(url_for("login"))
-
-        ads_watched, _ = status
-
-        if ads_watched >= MAX_ADS:
-            flash(
-                "You have reached 25 ads in this 2-hour window.",
-                "error"
-            )
+        if status[0] >= MAX_ADS:
+            flash("You have reached 25 ads in this 2-hour window.", "error")
             return redirect(url_for("dashboard"))
-
         session["ad_page_opened_at"] = time.time()
         return render_template("watch_ad.html")
-
     except Exception:
-        app.logger.exception("Watch-ad page failed.")
-        flash("Could not open the ad page. Please try again.", "error")
+        app.logger.exception("Watch ad failed")
+        flash("Could not open the ad page.", "error")
         return redirect(url_for("dashboard"))
 
 
@@ -406,95 +287,56 @@ def watch_ad():
 def claim_reward():
     if "user_id" not in session:
         return redirect(url_for("login"))
-
     opened_at = session.get("ad_page_opened_at")
-
     if opened_at is None or time.time() - opened_at < 10:
-        flash("Please complete the ad before claiming a reward.", "error")
+        flash("Please wait at least 10 seconds before claiming.", "error")
         return redirect(url_for("watch_ad"))
 
-    conn = None
-    cursor = None
-
+    conn = get_db()
+    cursor = conn.cursor()
     try:
-        conn = get_db()
-        cursor = conn.cursor()
-        user_id = session["user_id"]
-        now = datetime.now()
-
+        p = "%s" if DATABASE_URL else "?"
         if DATABASE_URL:
             cursor.execute(
-                "SELECT points, ads_watched_count, last_ad_time "
-                "FROM users WHERE id = %s FOR UPDATE",
-                (user_id,)
+                "SELECT points, ads_watched_count, last_ad_time FROM users WHERE id = %s FOR UPDATE",
+                (session["user_id"],)
             )
         else:
+            cursor.execute("BEGIN IMMEDIATE")
             cursor.execute(
-                "SELECT points, ads_watched_count, last_ad_time "
-                "FROM users WHERE id = ?",
-                (user_id,)
+                "SELECT points, ads_watched_count, last_ad_time FROM users WHERE id = ?",
+                (session["user_id"],)
             )
-
         row = cursor.fetchone()
-
         if not row:
             conn.rollback()
             session.clear()
-            flash("Account not found. Please log in again.", "error")
             return redirect(url_for("login"))
-
-        points = row[0] or 0
-        count = row[1] or 0
+        points, count = row[0] or 0, row[1] or 0
         last_time = parse_datetime(row[2])
-
-        if last_time and now - last_time >= AD_WINDOW:
+        if last_time and datetime.now() - last_time >= AD_WINDOW:
             count = 0
-
         if count >= MAX_ADS:
             conn.rollback()
             session.pop("ad_page_opened_at", None)
-            flash("You have reached the 25-ad limit. Please wait.", "error")
+            flash("You have reached the 25-ad limit.", "error")
             return redirect(url_for("dashboard"))
-
-        if DATABASE_URL:
-            cursor.execute(
-                "UPDATE users SET points = %s, "
-                "ads_watched_count = %s, last_ad_time = %s "
-                "WHERE id = %s",
-                (points + POINTS_PER_AD, count + 1, now, user_id)
-            )
-        else:
-            cursor.execute(
-                "UPDATE users SET points = ?, "
-                "ads_watched_count = ?, last_ad_time = ? "
-                "WHERE id = ?",
-                (
-                    points + POINTS_PER_AD,
-                    count + 1,
-                    now.isoformat(sep=" "),
-                    user_id
-                )
-            )
-
-        if cursor.rowcount != 1:
-            raise RuntimeError("Reward update did not update one user.")
-
+        now = datetime.now()
+        timestamp = now if DATABASE_URL else now.isoformat(sep=" ")
+        cursor.execute(
+            f"UPDATE users SET points = points + {p}, ads_watched_count = {p}, last_ad_time = {p} WHERE id = {p}",
+            (POINTS_PER_AD, count + 1, timestamp, session["user_id"])
+        )
         conn.commit()
         session.pop("ad_page_opened_at", None)
         flash("3 Poly Points added to your balance!", "success")
-
     except Exception:
-        if conn:
-            conn.rollback()
-        app.logger.exception("Claim reward failed.")
-        flash("Reward claim failed. Please try again later.", "error")
-
+        conn.rollback()
+        app.logger.exception("Reward claim failed")
+        flash("Reward claim failed. Please try again.", "error")
     finally:
-        if cursor:
-            cursor.close()
-        if conn:
-            conn.close()
-
+        cursor.close()
+        conn.close()
     return redirect(url_for("dashboard"))
 
 
@@ -502,52 +344,138 @@ def claim_reward():
 def withdraw():
     if "user_id" not in session:
         return redirect(url_for("login"))
-
-    conn = None
-    cursor = None
-
+    conn = get_db()
+    cursor = conn.cursor()
+    p = "%s" if DATABASE_URL else "?"
     try:
-        conn = get_db()
-        cursor = conn.cursor()
-        placeholder = "%s" if DATABASE_URL else "?"
-
+        if DATABASE_URL:
+            cursor.execute("SELECT points FROM users WHERE id = %s FOR UPDATE", (session["user_id"],))
+        else:
+            cursor.execute("BEGIN IMMEDIATE")
+            cursor.execute("SELECT points FROM users WHERE id = ?", (session["user_id"],))
+        row = cursor.fetchone()
+        if not row:
+            conn.rollback()
+            session.clear()
+            return redirect(url_for("login"))
+        points = row[0] or 0
+        if points < MIN_WITHDRAWAL_POINTS:
+            conn.rollback()
+            flash("Minimum withdrawal is 6,000 points ($30).", "error")
+            return redirect(url_for("dashboard"))
         cursor.execute(
-            f"SELECT points FROM users WHERE id = {placeholder}",
+            f"SELECT id FROM withdrawals WHERE user_id = {p} AND status = 'pending'",
             (session["user_id"],)
         )
-        row = cursor.fetchone()
-
-        if not row:
-            session.clear()
-            flash("Account not found. Please log in again.", "error")
-            return redirect(url_for("login"))
-
-        points = row[0] or 0
-
-        if points < MIN_WITHDRAWAL_POINTS:
-            flash(
-                f"Minimum withdrawal is 6,000 points ($30). "
-                f"Your balance is {points} points.",
-                "error"
-            )
-        else:
-            flash(
-                "You meet the minimum balance. Payout processing is not "
-                "configured yet, so no withdrawal has been submitted.",
-                "error"
-            )
-
+        if cursor.fetchone():
+            conn.rollback()
+            flash("You already have a pending withdrawal request.", "error")
+            return redirect(url_for("dashboard"))
+        cursor.execute(
+            f"UPDATE users SET points = points - {p} WHERE id = {p}",
+            (points, session["user_id"])
+        )
+        cursor.execute(
+            f"INSERT INTO withdrawals (user_id, points, status) VALUES ({p}, {p}, 'pending')",
+            (session["user_id"], points)
+        )
+        conn.commit()
+        flash("Withdrawal request submitted. Your points are reserved while it is reviewed.", "success")
     except Exception:
-        app.logger.exception("Withdrawal check failed.")
-        flash("Could not check your withdrawal balance.", "error")
-
+        conn.rollback()
+        app.logger.exception("Withdrawal request failed")
+        flash("Could not submit your withdrawal request.", "error")
     finally:
-        if cursor:
-            cursor.close()
-        if conn:
-            conn.close()
-
+        cursor.close()
+        conn.close()
     return redirect(url_for("dashboard"))
+
+
+@app.route("/admin")
+def admin_dashboard():
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+    if not is_admin_user():
+        flash("You are not authorized to access the admin dashboard.", "error")
+        return redirect(url_for("dashboard"))
+
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT id, username, email, points FROM users ORDER BY id DESC")
+        users = cursor.fetchall()
+        cursor.execute("""
+            SELECT w.id, u.username, u.email, w.points, w.status, w.created_at
+            FROM withdrawals w JOIN users u ON u.id = w.user_id
+            ORDER BY w.id DESC
+        """)
+        withdrawals = cursor.fetchall()
+        return render_template("admin.html", users=users, withdrawals=withdrawals)
+    except Exception:
+        app.logger.exception("Admin dashboard failed")
+        flash("Could not load admin dashboard.", "error")
+        return redirect(url_for("dashboard"))
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@app.route("/admin/withdrawal/<int:withdrawal_id>/<action>", methods=["POST"])
+def process_withdrawal(withdrawal_id, action):
+    if "user_id" not in session:
+        return redirect(url_for("login"))
+    if not is_admin_user():
+        flash("Unauthorized action.", "error")
+        return redirect(url_for("dashboard"))
+    if action not in ("approve", "reject"):
+        flash("Invalid action.", "error")
+        return redirect(url_for("admin_dashboard"))
+
+    conn = get_db()
+    cursor = conn.cursor()
+    p = "%s" if DATABASE_URL else "?"
+    try:
+        if not DATABASE_URL:
+            cursor.execute("BEGIN IMMEDIATE")
+        lock = " FOR UPDATE" if DATABASE_URL else ""
+        cursor.execute(
+            f"SELECT user_id, points, status FROM withdrawals WHERE id = {p}{lock}",
+            (withdrawal_id,)
+        )
+        row = cursor.fetchone()
+        if not row:
+            conn.rollback()
+            flash("Withdrawal request not found.", "error")
+            return redirect(url_for("admin_dashboard"))
+        user_id, points, status = row
+        if status != "pending":
+            conn.rollback()
+            flash("This request has already been processed.", "error")
+            return redirect(url_for("admin_dashboard"))
+
+        new_status = "approved" if action == "approve" else "rejected"
+        if action == "reject":
+            cursor.execute(
+                f"UPDATE users SET points = points + {p} WHERE id = {p}",
+                (points, user_id)
+            )
+        cursor.execute(
+            f"UPDATE withdrawals SET status = {p}, processed_at = CURRENT_TIMESTAMP WHERE id = {p}",
+            (new_status, withdrawal_id)
+        )
+        conn.commit()
+        if action == "approve":
+            flash("Approved. You must still arrange the actual payout.", "success")
+        else:
+            flash("Rejected. The user's points have been returned.", "success")
+    except Exception:
+        conn.rollback()
+        app.logger.exception("Withdrawal processing failed")
+        flash("Could not process this request.", "error")
+    finally:
+        cursor.close()
+        conn.close()
+    return redirect(url_for("admin_dashboard"))
 
 
 @app.route("/logout")
@@ -556,7 +484,6 @@ def logout():
     return redirect(url_for("login"))
 
 
-# Run database setup during startup, including under Gunicorn on Render.
 init_db()
 
 
@@ -565,4 +492,5 @@ if __name__ == "__main__":
         host="0.0.0.0",
         port=int(os.environ.get("PORT", 5000)),
         debug=False
-    )
+                          )
+                                                                   
