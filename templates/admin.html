@@ -4,125 +4,616 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Poly Earn Admin Dashboard</title>
+    <title>Poly Earn | Admin Panel</title>
+
     <style>
+        :root {
+            --bg: #07130f;
+            --panel: #10221a;
+            --panel2: #142b20;
+            --green: #16c784;
+            --green-dark: #087f50;
+            --gold: #f4c95d;
+            --white: #f3f8f5;
+            --muted: #9bb0a4;
+            --border: #254334;
+            --red: #ff6474;
+        }
+
+        * { box-sizing: border-box; }
+
         body {
-            font-family: Arial, sans-serif;
-            background: #f3f4f6;
             margin: 0;
-            padding: 20px;
-            color: #222;
+            font-family: Arial, sans-serif;
+            background: var(--bg);
+            color: var(--white);
         }
-        h1, h2 { color: #14532d; }
-        .card {
-            background: white;
-            padding: 16px;
-            margin-bottom: 20px;
-            border-radius: 10px;
-            overflow-x: auto;
+
+        button, a { font: inherit; }
+        a { color: inherit; text-decoration: none; }
+
+        .layout {
+            display: flex;
+            min-height: 100vh;
         }
-        table {
+
+        .sidebar {
+            width: 245px;
+            background: #0b1c14;
+            border-right: 1px solid var(--border);
+            padding: 24px 15px;
+            flex-shrink: 0;
+        }
+
+        .brand {
+            font-size: 23px;
+            font-weight: bold;
+            color: var(--green);
+            padding: 0 10px;
+            margin-bottom: 5px;
+        }
+
+        .brand span { color: var(--gold); }
+
+        .brand-sub {
+            color: var(--muted);
+            font-size: 12px;
+            padding: 0 10px;
+            margin-bottom: 30px;
+        }
+
+        .nav-label {
+            color: var(--muted);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            padding: 12px 10px;
+        }
+
+        .nav-btn {
             width: 100%;
-            border-collapse: collapse;
-            min-width: 500px;
-        }
-        th, td {
+            display: block;
             text-align: left;
-            padding: 10px;
-            border-bottom: 1px solid #ddd;
-        }
-        th { background: #e5e7eb; }
-        button {
-            padding: 8px 12px;
+            background: transparent;
             border: 0;
-            border-radius: 5px;
-            color: white;
+            color: #c7d8ce;
+            padding: 13px 12px;
+            margin: 4px 0;
+            border-radius: 8px;
             cursor: pointer;
         }
-        .approve { background: #15803d; }
-        .reject { background: #b91c1c; }
-        .empty { color: #666; }
+
+        .nav-btn:hover,
+        .nav-btn.active {
+            background: #163c2b;
+            color: var(--green);
+        }
+
+        .nav-btn.active {
+            border-left: 3px solid var(--green);
+        }
+
+        .sidebar-bottom {
+            margin-top: 35px;
+            border-top: 1px solid var(--border);
+            padding-top: 15px;
+        }
+
+        .logout { color: var(--red); }
+
+        .main {
+            flex: 1;
+            min-width: 0;
+            padding: 28px;
+        }
+
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin-bottom: 28px;
+        }
+
+        .topbar h1 {
+            font-size: 25px;
+            margin: 0 0 7px;
+        }
+
+        .muted { color: var(--muted); font-size: 13px; }
+
+        .admin-tag {
+            border: 1px solid #306c4e;
+            background: #123522;
+            color: var(--green);
+            padding: 9px 13px;
+            border-radius: 20px;
+            font-size: 12px;
+        }
+
+        .view { display: none; }
+        .view.active { display: block; }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card, .card {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 13px;
+            padding: 20px;
+        }
+
+        .stat-card {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card::after {
+            content: "";
+            position: absolute;
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background: #16c78412;
+            right: -15px;
+            top: -15px;
+        }
+
+        .stat-label {
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .stat-value {
+            font-size: 29px;
+            font-weight: bold;
+            margin-top: 14px;
+            color: var(--white);
+            overflow-wrap: anywhere;
+        }
+
+        .stat-icon {
+            color: var(--gold);
+            font-size: 20px;
+            margin-bottom: 12px;
+        }
+
+        .card { margin-bottom: 22px; }
+
+        .card-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 18px;
+        }
+
+        .card h2 {
+            font-size: 18px;
+            margin: 0;
+        }
+
+        .table-wrap {
+            overflow-x: auto;
+            width: 100%;
+        }
+
+        table {
+            width: 100%;
+            min-width: 570px;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 14px 12px;
+            border-bottom: 1px solid var(--border);
+            font-size: 13px;
+        }
+
+        th {
+            color: var(--muted);
+            background: #14291f;
+            font-weight: 600;
+        }
+
+        td { color: #e1ece5; }
+        tbody tr:hover { background: #ffffff05; }
+
+        .status {
+            display: inline-block;
+            padding: 5px 9px;
+            border-radius: 20px;
+            background: #2a3328;
+            color: var(--gold);
+            font-size: 11px;
+        }
+
+        .status.pending {
+            background: #463719;
+            color: var(--gold);
+        }
+
+        .status.approved {
+            background: #123d2b;
+            color: var(--green);
+        }
+
+        .status.rejected {
+            background: #421d26;
+            color: var(--red);
+        }
+
+        .action-btn {
+            border: 0;
+            border-radius: 6px;
+            padding: 8px 10px;
+            color: white;
+            font-size: 12px;
+            cursor: pointer;
+            margin: 2px;
+        }
+
+        .approve { background: var(--green-dark); }
+        .reject { background: #9f2938; }
+
+        .empty {
+            color: var(--muted);
+            padding: 20px 0;
+        }
+
+        .notice {
+            padding: 14px;
+            border: 1px solid #695626;
+            background: #332a17;
+            color: #f7d987;
+            border-radius: 9px;
+            line-height: 1.6;
+            font-size: 13px;
+        }
+
+        .footer {
+            color: var(--muted);
+            font-size: 12px;
+            padding: 10px 0 20px;
+        }
+
+        @media (max-width: 850px) {
+            .sidebar { width: 205px; }
+            .main { padding: 20px; }
+            .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+
+        @media (max-width: 600px) {
+            .layout { display: block; }
+
+            .sidebar {
+                width: 100%;
+                padding: 16px 12px;
+                border-right: 0;
+                border-bottom: 1px solid var(--border);
+            }
+
+            .brand { font-size: 21px; }
+            .brand-sub { margin-bottom: 14px; }
+
+            .nav-label { padding: 8px 10px; }
+
+            .nav-menu {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 3px;
+            }
+
+            .nav-btn {
+                margin: 2px 0;
+                padding: 11px 9px;
+                font-size: 13px;
+            }
+
+            .sidebar-bottom { margin-top: 12px; }
+
+            .main { padding: 18px 12px; }
+            .topbar h1 { font-size: 22px; }
+            .stats { gap: 10px; }
+            .stat-card { padding: 14px; }
+            .stat-value { font-size: 23px; }
+            .card { padding: 14px; }
+        }
     </style>
 </head>
+
 <body>
-    <h1>Poly Earn Admin Dashboard</h1>
+<div class="layout">
 
-    <div class="card">
-        <h2>Registered Users</h2>
-        {% if users %}
-        <table>
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Username</th>
-                    <th>Email</th>
-                    <th>Points</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for user in users %}
-                <tr>
-                    <td>{{ user[0] }}</td>
-                    <td>{{ user[1] }}</td>
-                    <td>{{ user[2] }}</td>
-                    <td>{{ user[3] }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        {% else %}
-        <p class="empty">No registered users yet.</p>
-        {% endif %}
-    </div>
+    <aside class="sidebar">
+        <div class="brand">POLY <span>EARN</span></div>
+        <div class="brand-sub">ADMINISTRATION PANEL</div>
 
-    <div class="card">
-        <h2>Withdrawal Requests</h2>
-        {% if withdrawals %}
-        <table>
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Username</th>
-                    <th>Email</th>
-                    <th>Points</th>
-                    <th>Status</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for item in withdrawals %}
-                <tr>
-                    <td>{{ item[0] }}</td>
-                    <td>{{ item[1] }}</td>
-                    <td>{{ item[2] }}</td>
-                    <td>{{ item[3] }}</td>
-                    <td>{{ item[4] }}</td>
-                    <td>
-                        {% if item[4] == 'pending' %}
-                        <form method="POST"
-                              action="{{ url_for('process_withdrawal', withdrawal_id=item[0], action='approve') }}"
-                              style="display:inline">
-                            <button class="approve" type="submit">Approve</button>
-                        </form>
-                        <form method="POST"
-                              action="{{ url_for('process_withdrawal', withdrawal_id=item[0], action='reject') }}"
-                              style="display:inline">
-                            <button class="reject" type="submit">Reject</button>
-                        </form>
-                        {% else %}
-                        Completed review
-                        {% endif %}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        {% else %}
-        <p class="empty">No withdrawal requests yet.</p>
-        {% endif %}
-    </div>
+        <div class="nav-label">Main menu</div>
 
-    <p><a href="{{ url_for('dashboard') }}">Back to user dashboard</a></p>
-    <p><a href="{{ url_for('logout') }}">Log out</a></p>
-</body>
-</html>
+        <nav class="nav-menu">
+            <button class="nav-btn active" data-view="overview">▦ &nbsp; Overview</button>
+            <button class="nav-btn" data-view="users">♙ &nbsp; Users</button>
+            <button class="nav-btn" data-view="withdrawals">⇄ &nbsp; Withdrawals</button>
+            <button class="nav-btn" data-view="settings">⚙ &nbsp; Settings</button>
+            <button class="nav-btn" data-view="announcements">▤ &nbsp; Announcements</button>
+            <button class="nav-btn" data-view="support">✉ &nbsp; Support</button>
+            <button class="nav-btn" data-view="security">⬡ &nbsp; Security</button>
+            <button class="nav-btn" data-view="reports">▥ &nbsp; Reports</button>
+        </nav>
+
+        <div class="sidebar-bottom">
+            <a class="nav-btn" href="{{ url_for('dashboard') }}">↗ User Dashboard</a>
+            <a class="nav-btn logout" href="{{ url_for('logout') }}">⇥ Log Out</a>
+        </div>
+    </aside>
+
+    <main class="main">
+        <header class="topbar">
+            <div>
+                <h1 id="page-title">Dashboard Overview</h1>
+                <div class="muted">Manage your Poly Earn platform</div>
+            </div>
+            <div class="admin-tag">● ADMIN PANEL</div>
+        </header>
+
+        {% set pending_count = namespace(value=0) %}
+        {% for item in withdrawals %}
+            {% if item[4]|lower == 'pending' %}
+                {% set pending_count.value = pending_count.value + 1 %}
+            {% endif %}
+        {% endfor %}
+
+        {% set points_total = namespace(value=0) %}
+        {% for user in users %}
+            {% set points_total.value = points_total.value + (user[3]|int) %}
+        {% endfor %}
+
+        <section class="view active" id="view-overview">
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="stat-icon">♙</div>
+                    <div class="stat-label">Registered Users</div>
+                    <div class="stat-value">{{ users|length }}</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon">◷</div>
+                    <div class="stat-label">Pending Withdrawals</div>
+                    <div class="stat-value">{{ pending_count.value }}</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-icon">◆</div>
+                    <div class="stat-label">Total User Points</div>
+                    <div class="stat-value">{{ points_total.value }}</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-head">
+                    <h2>Recent Users</h2>
+                    <button class="action-btn approve" data-go="users">View Users →</button>
+                </div>
+
+                {% if users %}
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th><th>Username</th><th>Email</th><th>Points</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for user in users[:5] %}
+                            <tr>
+                                <td>{{ user[0] }}</td>
+                                <td>{{ user[1] }}</td>
+                                <td>{{ user[2] }}</td>
+                                <td>{{ user[3] }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="empty">No registered users yet.</p>
+                {% endif %}
+            </div>
+
+            <div class="card">
+                <div class="card-head">
+                    <h2>Withdrawal Requests</h2>
+                    <button class="action-btn approve" data-go="withdrawals">View Requests →</button>
+                </div>
+
+                {% if withdrawals %}
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th><th>Username</th><th>Points</th><th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in withdrawals[:5] %}
+                            <tr>
+                                <td>{{ item[0] }}</td>
+                                <td>{{ item[1] }}</td>
+                                <td>{{ item[3] }}</td>
+                                <td><span class="status {{ item[4]|lower }}">{{ item[4] }}</span></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="empty">No withdrawal requests yet.</p>
+                {% endif %}
+            </div>
+        </section>
+
+        <section class="view" id="view-users">
+            <div class="card">
+                <div class="card-head">
+                    <h2>Registered Users</h2>
+                    <span class="admin-tag">{{ users|length }} users</span>
+                </div>
+
+                {% if users %}
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th><th>Username</th><th>Email</th><th>Points</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for user in users %}
+                            <tr>
+                                <td>{{ user[0] }}</td>
+                                <td>{{ user[1] }}</td>
+                                <td>{{ user[2] }}</td>
+                                <td>{{ user[3] }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="empty">No registered users yet.</p>
+                {% endif %}
+            </div>
+        </section>
+
+        <section class="view" id="view-withdrawals">
+            <div class="card">
+                <div class="card-head">
+                    <h2>Withdrawal Management</h2>
+                    <span class="admin-tag">{{ pending_count.value }} pending</span>
+                </div>
+
+                {% if withdrawals %}
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th><th>Username</th><th>Email</th>
+                                <th>Points</th><th>Status</th><th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in withdrawals %}
+                            <tr>
+                                <td>{{ item[0] }}</td>
+                                <td>{{ item[1] }}</td>
+                                <td>{{ item[2] }}</td>
+                                <td>{{ item[3] }}</td>
+                                <td><span class="status {{ item[4]|lower }}">{{ item[4] }}</span></td>
+                                <td>
+                                    {% if item[4]|lower == 'pending' %}
+                                    <form method="POST"
+                                          action="{{ url_for('process_withdrawal', withdrawal_id=item[0], action='approve') }}"
+                                          style="display:inline">
+                                        <button class="action-btn approve" type="submit">Approve</button>
+                                    </form>
+                                    <form method="POST"
+                                          action="{{ url_for('process_withdrawal', withdrawal_id=item[0], action='reject') }}"
+                                          style="display:inline">
+                                        <button class="action-btn reject" type="submit">Reject</button>
+                                    </form>
+                                    {% else %}
+                                    Reviewed
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="empty">No withdrawal requests yet.</p>
+                {% endif %}
+            </div>
+        </section>
+
+        <section class="view" id="view-settings">
+            <div class="card">
+                <h2>Website Settings</h2>
+                <p class="empty">The settings interface has not been connected yet.</p>
+                <div class="notice">This section is a placeholder. We must connect real settings to your Flask backend before any changes can be saved.</div>
+            </div>
+        </section>
+
+        <section class="view" id="view-announcements">
+            <div class="card">
+                <h2>Announcements</h2>
+                <p class="empty">The announcement manager has not been connected yet.</p>
+                <div class="notice">We will connect this section to a database and a user-facing announcement system before enabling publishing.</div>
+            </div>
+        </section>
+
+        <section class="view" id="view-support">
+            <div class="card">
+                <h2>Support Center</h2>
+                <p class="empty">Support ticket management has not been connected yet.</p>
+                <div class="notice">This section needs a support-ticket data source before it can display or manage real requests.</div>
+            </div>
+        </section>
+
+        <section class="view" id="view-security">
+            <div class="card">
+                <h2>Security & Login History</h2>
+                <p class="empty">Open the existing login-history page to review recorded attempts.</p>
+                <a class="action-btn approve" style="display:inline-block"
+                   href="{{ url_for('admin_login_history') }}">Open Login History →</a>
+                <div class="notice" style="margin-top:18px">This link requires the Flask endpoint to be named <strong>admin_login_history</strong>. If your route uses another name, we will adjust it to match your app.py.</div>
+            </div>
+        </section>
+
+        <section class="view" id="view-reports">
+            <div class="card">
+                <h2>Platform Reports</h2>
+                <p class="empty">Report generation has not been connected yet.</p>
+                <div class="notice">We will build reports using actual user, points and withdrawal records. No report data is fabricated here.</div>
+            </div>
+        </section>
+
+        <div class="footer">Poly Earn Admin Panel · Dark Emerald Edition</div>
+    </main>
+</div>
+
+<script>
+    const navButtons = document.querySelectorAll("[data-view]");
+    const views = document.querySelectorAll(".view");
+    const pageTitle = document.getElementById("page-title");
+
+    const titles = {
+        overview: "Dashboard Overview",
+        users: "Manage Users",
+        withdrawals: "Withdrawal Management",
+        settings: "Website Settings",
+        announcements: "Announcements",
+        support: "Support Center",
+        security: "Security & Login History",
+        reports: "Platform Reports"
+    };
+
+    function showView(name) {
+        views.forEach(view => {
+            view.classList.toggle("active", view.id === "view-" + name);
+        });
+
+        navButtons.forEach(button => {
+            button.classList.toggle("active", button.dataset.view === name);
+        });
+
+        pageTitl
