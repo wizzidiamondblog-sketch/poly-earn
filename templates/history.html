@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Poly Earn - Transaction History</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-[#0b0e14] text-white min-h-screen font-sans pb-24">
+
+  <header class="bg-[#121722] border-b border-gray-800 p-4">
+    <div class="max-w-4xl mx-auto flex justify-between items-center">
+      <a href="{{ url_for('dashboard') }}"
+         class="text-xl font-bold text-purple-400">
+        Poly Earn
+      </a>
+      <a href="{{ url_for('dashboard') }}"
+         class="text-sm text-gray-300 hover:text-white">
+        Dashboard
+      </a>
+    </div>
+  </header>
+
+  <main class="max-w-4xl mx-auto p-4">
+
+    <h1 class="text-2xl font-bold mt-5">Transaction History</h1>
+    <p class="text-gray-400 mt-2">
+      Check your recent points and balance activity.
+    </p>
+
+    <div class="bg-[#151b28] border border-gray-800 rounded-2xl p-5 mt-6">
+      <h2 class="font-bold">Your Transactions</h2>
+
+      {% if transactions %}
+        <div class="mt-4 space-y-4">
+
+          {% for tx in transactions %}
+            <div class="border-b border-gray-800 pb-4 last:border-0">
+
+              <div class="flex justify-between items-start gap-3">
+                <div class="min-w-0">
+                  <p class="font-semibold break-words">
+                    {{ tx.description or tx.type or 'Transaction' }}
+                  </p>
+
+                  <p class="text-gray-500 text-xs mt-1">
+                    {{ tx.created_at or 'Date unavailable' }}
+                  </p>
+                </div>
+
+                <span class="text-xs rounded-full px-2 py-1 bg-gray-800 shrink-0">
+                  {{ tx.type or 'Activity' }}
+                </span>
+              </div>
+
+              <div class="flex flex-wrap gap-x-5 gap-y-2 mt-3 text-sm">
+
+                {% if tx.points_change %}
+                  <p class="{% if tx.points_change|float > 0 %}text-green-400{% else %}text-red-400{% endif %}">
+                    {% if tx.points_change|float > 0 %}+{% endif %}
+                    {{ tx.points_change }} points
+                  </p>
+                {% endif %}
+
+                {% if tx.usd_change %}
+                  <p class="{% if tx.usd_change|float > 0 %}text-green-400{% else %}text-red-400{% endif %}">
+                    {% if tx.usd_change|float > 0 %}+{% endif %}
+                    ${{ "%.2f"|format(tx.usd_change|float|abs) }}
+                  </p>
+                {% endif %}
+
+                {% if not tx.points_change and not tx.usd_change %}
+                  <p class="text-gray-400">Activity recorded</p>
+                {% endif %}
+
+              </div>
+            </div>
+          {% endfor %}
+
+        </div>
+      {% else %}
+        <div class="text-center py-10">
+          <p class="text-4xl">📋</p>
+          <p class="font-semibold mt-3">No transactions yet</p>
+          <p class="text-gray-400 text-sm mt-2">
+            Your points and balance activity will appear here.
+          </p>
+        </div>
+      {% endif %}
+    </div>
+
+    <a href="{{ url_for('dashboard') }}"
+       class="block text-center text-gray-400 mt-8">
+      ← Back to Dashboard
+    </a>
+
+  </main>
+
+</body>
+</html>
