@@ -1,0 +1,108 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Admin Login History | Poly Earn</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 20px;
+      background: #06130f;
+      color: #ecfdf5;
+      font: 14px Arial, sans-serif;
+    }
+    .container { max-width: 1100px; margin: auto; }
+    .panel {
+      background: #0d2119;
+      border: 1px solid #234638;
+      border-radius: 14px;
+      padding: 20px;
+      margin-top: 20px;
+    }
+    h1 { font-size: 25px; }
+    p { color: #9bb8aa; line-height: 1.6; }
+    a {
+      display: inline-block;
+      color: #34d399;
+      margin: 8px 12px 8px 0;
+      text-decoration: none;
+    }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; min-width: 700px; }
+    th, td {
+      padding: 12px;
+      border-bottom: 1px solid #234638;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { color: #9bb8aa; font-size: 12px; }
+    .success { color: #34d399; font-weight: bold; }
+    .failed { color: #f87171; font-weight: bold; }
+    .device {
+      max-width: 240px;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      color: #9bb8aa;
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <h1>Admin Login History</h1>
+    <p>
+      Review recent login attempts for the configured admin email.
+      Passwords are never displayed here.
+    </p>
+
+    <nav>
+      <a href="{{ url_for('admin_dashboard') }}">← Back to Dashboard</a>
+      <a href="{{ url_for('logout') }}">Log out</a>
+    </nav>
+
+    <section class="panel">
+      <h2>Recent attempts</h2>
+      <p>Showing up to 200 most recent records.</p>
+
+      {% if history %}
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Date and time</th>
+                <th>Email</th>
+                <th>Result</th>
+                <th>IP address</th>
+                <th>Device / browser</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in history %}
+                <tr>
+                  <td>{{ item[5] }}</td>
+                  <td>{{ item[1] }}</td>
+                  <td>
+                    {% if item[2] %}
+                      <span class="success">Successful</span>
+                    {% else %}
+                      <span class="failed">Failed</span>
+                    {% endif %}
+                  </td>
+                  <td>{{ item[3] or 'Unavailable' }}</td>
+                  <td class="device">{{ item[4] or 'Unavailable' }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p>No login attempts recorded yet. New attempts using the
+        configured admin email will appear here.</p>
+      {% endif %}
+    </section>
+  </main>
+</body>
+        </html>
+        
