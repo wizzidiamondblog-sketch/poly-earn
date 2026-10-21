@@ -1,1 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Poly Earn - Invite Friends</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
 
+<body class="bg-[#0b0e14] text-white min-h-screen font-sans pb-24">
+
+  <header class="bg-[#121722] border-b border-gray-800 p-4">
+    <div class="max-w-4xl mx-auto flex justify-between items-center">
+      <a href="{{ url_for('dashboard') }}"
+         class="text-xl font-bold text-purple-400">Poly Earn</a>
+      <a href="{{ url_for('dashboard') }}"
+         class="text-sm text-gray-300">Dashboard</a>
+    </div>
+  </header>
+
+  <main class="max-w-4xl mx-auto p-4">
+
+    <h1 class="text-2xl font-bold mt-5">Invite Friends</h1>
+    <p class="text-gray-400 mt-2">
+      Share your referral link and earn points when friends register.
+    </p>
+
+    <div class="bg-[#151b28] border border-gray-800 rounded-2xl p-5 mt-6">
+      <p class="text-gray-400 text-sm">Referral Reward</p>
+      <h2 class="text-3xl font-bold text-green-400 mt-2">50 Points</h2>
+      <p class="text-gray-400 text-sm mt-2">
+        You receive 50 points for each eligible friend who registers using your link.
+      </p>
+    </div>
+
+    <div class="bg-[#151b28] border border-gray-800 rounded-2xl p-5 mt-4">
+      <label class="block text-sm text-gray-400 mb-2">Your Referral Link</label>
+
+      <input
+        id="referralLink"
+        type="text"
+        readonly
+        value="{{ referral_link }}"
+        class="w-full bg-[#0b0e14] border border-gray-700 rounded-xl p-3 text-sm text-white"
+      >
+
+      <button
+        type="button"
+        onclick="copyReferral()"
+        class="w-full mt-3 bg-purple-600 hover:bg-purple-700 rounded-xl py-3 font-bold">
+        Copy Referral Link
+      </button>
+
+      <p id="copyMessage" class="text-green-400 text-sm mt-2 hidden">
+        Referral link copied!
+      </p>
+    </div>
+
+    <div class="grid grid-cols-2 gap-3 mt-4">
+      <div class="bg-[#151b28] border border-gray-800 rounded-xl p-4">
+        <p class="text-gray-400 text-sm">Total Referrals</p>
+        <p class="text-2xl font-bold mt-2">{{ referral_count }}</p>
+      </div>
+
+      <div class="bg-[#151b28] border border-gray-800 rounded-xl p-4">
+        <p class="text-gray-400 text-sm">Referral Points</p>
+        <p class="text-2xl font-bold text-green-400 mt-2">{{ referral_points }}</p>
+      </div>
+    </div>
+
+    <div class="bg-[#151b28] border border-gray-800 rounded-2xl p-5 mt-4">
+      <h2 class="font-bold">Your Referred Friends</h2>
+
+      {% if referrals %}
+        <div class="mt-4 space-y-3">
+          {% for referral in referrals %}
+            <div class="flex justify-between gap-3 border-b border-gray-800 pb-3">
+              <span class="font-medium">{{ referral[0] }}</span>
+              <span class="text-gray-400 text-sm">{{ referral[1] or 'Registered' }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="text-gray-400 text-sm mt-3">
+          You haven't referred any friends yet. Share your link to get started.
+        </p>
+      {% endif %}
+    </div>
+
+    <a href="{{ url_for('dashboard') }}"
+       class="block text-center text-gray-400 mt-8">
+      ← Back to Dashboard
+    </a>
+
+  </main>
+
+  <script>
+    function copyReferral() {
+      const input = document.getElementById("referralLink");
+      const message = document.getElementById("copyMessage");
+
+      input.select();
+      input.setSelectionRange(0, 99999);
+
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(input.value)
+          .then(() => {
+            message.classList.remove("hidden");
+          })
+          .catch(() => fallbackCopy(input, message));
+      } else {
+        fallbackCopy(input, message);
+      }
+    }
+
+    function fallbackCopy(input, message) {
+      try {
+        const copied = document.execCommand("copy");
+        if (copied) {
+          message.classList.remove("hidden");
+        } else {
+          alert("Please select and copy the referral link manually.");
+        }
+      } catch (error) {
+        alert("Please select and copy the referral link manually.");
+      }
+    }
+  </script>
+
+</body>
+  </html>
