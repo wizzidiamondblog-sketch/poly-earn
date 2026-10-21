@@ -706,5 +706,106 @@ def withdraw():
         app.logger.exception("Withdrawal request failed.")
         flash("Could not submit your withdrawal request.", "error")
 
+    
     finally:
         cursor.close()
+        conn.close()
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    flash("You have been logged out.", "success")
+    return redirect(url_for("login"))
+
+
+@app.route("/admin")
+def admin_dashboard():
+    if not is_admin_user():
+        session.clear()
+        flash("Please log in with your admin account.", "error")
+        return redirect(url_for("admin_login"))
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("SELECT COUNT(*) FROM users")
+        total_users = cursor.fetchone()[0]
+
+        cursor.execute(
+            "SELECT COUNT(*) FROM withdrawals WHERE status = 'pending'"
+        )
+        pending_withdrawals = cursor.fetchone()[0]
+
+        cursor.execute("SELECT COALESCE(SUM(points), 0) FROM users")
+        total_points = cursor.fetchone()[0]
+
+        cursor.execute("""
+            SELECT id, username, email, points
+            FROM users
+            ORDER BY id DESC
+        """)
+        users = cursor.fetchall()
+
+        cursor.execute("""
+            SELECT id, user_id, points, status, created_at
+            FROM withdrawals
+            ORDER BY id DESC
+        """)
+        withdrawals = cursor.fetchall()
+
+        return render_template(
+            "admin.html",
+            total_users=total_users,
+            pending_withdrawals=pending_withdrawals,
+            total_points=total_points,
+            users=users,
+            withdrawals=withdrawals
+        )
+
+    except Exception:
+        app.logger.exception("Admin dashboard failed.")
+        flash("Could not load the admin dashboard.", "error")
+        return redirect(url_for("admin_login"))
+
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@app.route("/admin-login-history")
+def admin_login_history():
+    if not is_admin_user():
+        return redirect(url_for("admin_login"))
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("""
+            SELECT email, success, ip_address, user_agent, created_at
+            FROM admin_login_history
+            ORDER BY id DESC
+            LIMIT 100
+        """)
+        attempts = cursor.fetchall()
+
+        return render_template(
+            "admin_login_history.html",
+            attempts=attempts
+        )
+
+    except Exception:
+        app.logger.exception("Admin login history failed.")
+        flash("Could not load admin login history.", "error")
+        return redirect(url_for("admin_dashboard"))
+
+    finally:
+        cursor.close()
+        conn.close()
+
+
+# Initialize database tables on application startup.
+init_db()
+
