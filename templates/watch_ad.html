@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6,48 +7,81 @@
   <title>Poly Earn - Watch Ad</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
+
 <body class="bg-[#0b0e14] text-white min-h-screen flex flex-col justify-between p-6 select-none">
 
   <!-- Top Navigation -->
   <div class="max-w-md w-full mx-auto flex justify-between items-center">
-    <a href="/dashboard" class="w-10 h-10 bg-slate-800 border border-slate-700 rounded-full flex items-center justify-center text-white font-bold text-lg hover:bg-slate-700 transition">
+    <a href="/dashboard"
+       class="w-10 h-10 bg-slate-800 border border-slate-700 rounded-full flex items-center justify-center text-white font-bold text-lg hover:bg-slate-700 transition">
       ✕
     </a>
-    <span class="text-sm font-black tracking-wider bg-purple-600/20 border border-purple-500/40 text-purple-300 px-4 py-1.5 rounded-full backdrop-blur shadow-md" id="countdown-badge">
-      00:20
+
+    <span class="text-sm font-black tracking-wider bg-purple-600/20 border border-purple-500/40 text-purple-300 px-4 py-1.5 rounded-full backdrop-blur shadow-md"
+          id="countdown-badge">
+      00:30
     </span>
   </div>
 
-  <!-- Main Card Container -->
+  <!-- Main Card -->
   <div class="max-w-md w-full mx-auto bg-[#151922] border border-slate-800 rounded-3xl p-6 text-center space-y-6 shadow-2xl my-auto">
-    
-    <div id="icon-box" class="w-20 h-20 bg-gradient-to-tr from-purple-600 to-indigo-500 rounded-3xl flex items-center justify-center mx-auto text-white text-3xl shadow-lg shadow-purple-600/30 animate-pulse">
+
+    <div id="icon-box"
+         class="w-20 h-20 bg-gradient-to-tr from-purple-600 to-indigo-500 rounded-3xl flex items-center justify-center mx-auto text-white text-3xl shadow-lg shadow-purple-600/30 animate-pulse">
       ⚡
     </div>
 
     <div class="space-y-2">
-      <h2 id="status-heading" class="text-xl font-black text-white">Ad In Progress...</h2>
-      <p id="status-text" class="text-xs text-slate-400">Please wait 20 seconds. Your +3 Poly Points will be added automatically!</p>
+      <h2 id="status-heading" class="text-xl font-black text-white">
+        Ad In Progress...
+      </h2>
+
+      <p id="status-text" class="text-xs text-slate-400">
+        Your ad link is opening. Please wait 30 seconds.
+        Your +3 Poly Points will be credited after the timer.
+      </p>
     </div>
 
-    <!-- Live Timer Display -->
+    <!-- Countdown -->
     <div id="timer-box" class="py-2">
-      <div class="text-5xl font-black text-amber-400 tracking-wider" id="countdown">20</div>
-      <p class="text-xs text-slate-500 mt-2">Seconds remaining...</p>
+      <div class="text-5xl font-black text-amber-400 tracking-wider"
+           id="countdown">
+        30
+      </div>
+
+      <p class="text-xs text-slate-500 mt-2">
+        Seconds remaining...
+      </p>
     </div>
 
-    <!-- Auto Crediting Status -->
+    <!-- Crediting Status -->
     <div id="crediting-box" class="hidden py-4 space-y-2">
       <div class="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-      <p class="text-sm font-bold text-emerald-400">Crediting +3 Poly Points to your account...</p>
+
+      <p class="text-sm font-bold text-emerald-400">
+        Crediting +3 Poly Points to your account...
+      </p>
     </div>
 
-    <!-- Hidden Claim Form (Triggered automatically by Javascript) -->
-    <form id="auto-claim-form" action="/claim-reward" method="POST" class="hidden"></form>
+    <!-- Claim Form -->
+    <form id="auto-claim-form"
+          action="/claim-reward"
+          method="POST"
+          class="hidden">
+    </form>
 
-    <!-- Backup Direct Re-Open Link -->
+    <!-- Open Ad Link -->
     <div id="reopen-box" class="pt-1">
-      <a href="https://uplcm.com/4/12063392" target="_blank" class="text-xs text-sky-400 underline font-semibold">Ad didn't open? Tap here to view ad</a>
+      <a href="https://uplcm.com/4/12063392"
+         target="_blank"
+         rel="noopener noreferrer"
+         class="inline-block bg-purple-600 hover:bg-purple-700 text-white text-sm font-bold px-5 py-3 rounded-xl">
+        Open Ad Again
+      </a>
+
+      <p class="text-xs text-slate-500 mt-3">
+        If the ad did not open automatically, tap the button above.
+      </p>
     </div>
 
   </div>
@@ -57,34 +91,59 @@
   </div>
 
   <script>
-    let timeLeft = 20;
-    const countdownEl = document.getElementById('countdown');
-    const badge = document.getElementById('countdown-badge');
+    const AD_URL = "https://uplcm.com/4/12063392";
 
-    const downloadTimer = setInterval(function() {
+    let timeLeft = 30;
+
+    const countdownEl = document.getElementById("countdown");
+    const badge = document.getElementById("countdown-badge");
+
+    // Open the ad in a new tab when this page loads.
+    // Some mobile browsers may block automatic new tabs.
+    window.addEventListener("load", function () {
+      const adWindow = window.open(AD_URL, "_blank");
+
+      if (!adWindow) {
+        document.getElementById("status-text").innerText =
+          "Tap Open Ad Again to open the ad, then return here.";
+      }
+    });
+
+    const downloadTimer = setInterval(function () {
       timeLeft--;
-      countdownEl.innerText = timeLeft;
-      let secs = timeLeft < 10 ? "0" + timeLeft : timeLeft;
+
+      countdownEl.innerText = Math.max(timeLeft, 0);
+
+      const secs = timeLeft < 10 ? "0" + timeLeft : timeLeft;
       badge.innerText = "00:" + secs;
-      
+
       if (timeLeft <= 0) {
         clearInterval(downloadTimer);
-        
-        // Show crediting screen
-        document.getElementById('timer-box').classList.add('hidden');
-        document.getElementById('reopen-box').classList.add('hidden');
-        document.getElementById('crediting-box').classList.remove('hidden');
-        
-        document.getElementById('status-heading').innerText = "Crediting Points! 🎉";
-        document.getElementById('status-text').innerText = "Updating your balance...";
-        
-        badge.classList.replace('bg-purple-600/20', 'bg-emerald-600/20');
-        badge.classList.replace('text-purple-300', 'text-emerald-400');
+
+        document.getElementById("timer-box").classList.add("hidden");
+        document.getElementById("reopen-box").classList.add("hidden");
+        document.getElementById("crediting-box").classList.remove("hidden");
+
+        document.getElementById("status-heading").innerText =
+          "Crediting Points! 🎉";
+
+        document.getElementById("status-text").innerText =
+          "Updating your balance...";
+
+        badge.classList.replace(
+          "bg-purple-600/20",
+          "bg-emerald-600/20"
+        );
+
+        badge.classList.replace(
+          "text-purple-300",
+          "text-emerald-400"
+        );
+
         badge.innerText = "DONE!";
 
-        // Auto submit form to add points to balance in PostgreSQL
-        setTimeout(function() {
-          document.getElementById('auto-claim-form').submit();
+        setTimeout(function () {
+          document.getElementById("auto-claim-form").submit();
         }, 500);
       }
     }, 1000);
