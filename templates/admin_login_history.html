@@ -1,12 +1,15 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Admin Login History | Poly Earn</title>
+
   <style>
-    * { box-sizing: border-box; }
+    * {
+      box-sizing: border-box;
+    }
+
     body {
       margin: 0;
       padding: 20px;
@@ -14,7 +17,12 @@
       color: #ecfdf5;
       font: 14px Arial, sans-serif;
     }
-    .container { max-width: 1100px; margin: auto; }
+
+    .container {
+      max-width: 1100px;
+      margin: auto;
+    }
+
     .panel {
       background: #0d2119;
       border: 1px solid #234638;
@@ -22,67 +30,145 @@
       padding: 20px;
       margin-top: 20px;
     }
-    h1 { font-size: 25px; }
-    p { color: #9bb8aa; line-height: 1.6; }
-    a {
+
+    h1 {
+      font-size: 25px;
+      color: #34d399;
+    }
+
+    h2 {
+      color: #d1fae5;
+    }
+
+    p {
+      color: #9bb8aa;
+      line-height: 1.6;
+    }
+
+    nav {
+      margin: 20px 0;
+    }
+
+    nav a {
       display: inline-block;
       color: #34d399;
       margin: 8px 12px 8px 0;
       text-decoration: none;
     }
-    .table-wrap { overflow-x: auto; }
-    table { width: 100%; border-collapse: collapse; min-width: 700px; }
+
+    nav a:hover {
+      color: #a7f3d0;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 700px;
+    }
+
     th, td {
       padding: 12px;
       border-bottom: 1px solid #234638;
       text-align: left;
       vertical-align: top;
     }
-    th { color: #9bb8aa; font-size: 12px; }
-    .success { color: #34d399; font-weight: bold; }
-    .failed { color: #f87171; font-weight: bold; }
+
+    th {
+      background: #102b20;
+      color: #9bb8aa;
+      font-size: 12px;
+    }
+
+    td {
+      color: #ecfdf5;
+    }
+
+    .success {
+      color: #34d399;
+      font-weight: bold;
+    }
+
+    .failed {
+      color: #f87171;
+      font-weight: bold;
+    }
+
     .device {
       max-width: 240px;
       white-space: normal;
       overflow-wrap: anywhere;
       color: #9bb8aa;
     }
+
+    .empty {
+      padding: 25px;
+      text-align: center;
+      color: #9bb8aa;
+    }
+
+    .notice {
+      border-left: 3px solid #34d399;
+      padding-left: 12px;
+    }
   </style>
 </head>
+
 <body>
   <main class="container">
-    <h1>Admin Login History</h1>
+
+    <h1>Poly Earn Admin Login History</h1>
+
     <p>
-      Review recent login attempts for the configured admin email.
-      Passwords are never displayed here.
+      Review recent login attempts for your configured administrator account.
+      Passwords are never displayed on this page.
     </p>
 
     <nav>
-      <a href="{{ url_for('admin_dashboard') }}">← Back to Dashboard</a>
-      <a href="{{ url_for('logout') }}">Log out</a>
+      <a href="{{ url_for('admin_dashboard') }}">
+        ← Back to Admin Dashboard
+      </a>
+
+      <a href="{{ url_for('logout') }}">
+        Log out
+      </a>
     </nav>
 
     <section class="panel">
-      <h2>Recent attempts</h2>
-      <p>Showing up to 200 most recent records.</p>
+
+      <h2>Recent Login Attempts</h2>
+
+      <p class="notice">
+        This page displays up to 200 of the most recent recorded attempts.
+      </p>
 
       {% if history %}
+
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>Date and time</th>
+                <th>ID</th>
+                <th>Date and Time</th>
                 <th>Email</th>
                 <th>Result</th>
-                <th>IP address</th>
-                <th>Device / browser</th>
+                <th>IP Address</th>
+                <th>Device / Browser</th>
               </tr>
             </thead>
+
             <tbody>
               {% for item in history %}
                 <tr>
-                  <td>{{ item[5] }}</td>
+                  <td>{{ item[0] }}</td>
+
+                  <td>{{ item[5] or 'Unavailable' }}</td>
+
                   <td>{{ item[1] }}</td>
+
                   <td>
                     {% if item[2] %}
                       <span class="success">Successful</span>
@@ -90,19 +176,36 @@
                       <span class="failed">Failed</span>
                     {% endif %}
                   </td>
+
                   <td>{{ item[3] or 'Unavailable' }}</td>
-                  <td class="device">{{ item[4] or 'Unavailable' }}</td>
+
+                  <td class="device">
+                    {{ item[4] or 'Unavailable' }}
+                  </td>
                 </tr>
               {% endfor %}
             </tbody>
           </table>
         </div>
+
       {% else %}
-        <p>No login attempts recorded yet. New attempts using the
-        configured admin email will appear here.</p>
+
+        <div class="empty">
+          <h3>No login attempts recorded yet.</h3>
+          <p>
+            New attempts using your configured admin email will appear here
+            after the application records them.
+          </p>
+        </div>
+
       {% endif %}
+
     </section>
+
+    <p>
+      Poly Earn Admin Panel
+    </p>
+
   </main>
 </body>
-        </html>
-        
+</html>
