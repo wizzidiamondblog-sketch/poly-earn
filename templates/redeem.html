@@ -3,59 +3,144 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Poly Earn - Redeem USDT</title>
+  <title>Poly Earn - Redeem Points</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-[#0b0e14] text-white min-h-screen flex flex-col justify-between p-6 select-none">
 
-  <!-- Header -->
-  <div class="max-w-md w-full mx-auto flex justify-between items-center bg-[#151922] border border-slate-800 p-4 rounded-2xl">
-    <div>
-      <h1 class="text-base font-bold text-indigo-400">Redeem Poly Points</h1>
-      <p class="text-xs text-slate-400">Convert your points to USDT</p>
+<body class="bg-[#0b0e14] text-white min-h-screen font-sans pb-10">
+
+  <header class="bg-[#121722] border-b border-gray-800 p-4">
+    <div class="max-w-md mx-auto flex justify-between items-center">
+      <div>
+        <h1 class="text-xl font-bold text-purple-400">Poly Earn</h1>
+        <p class="text-xs text-gray-400">Redeem Points</p>
+      </div>
+
+      <a href="{{ url_for('dashboard') }}"
+         class="bg-gray-800 px-4 py-2 rounded-xl text-sm">
+        Back
+      </a>
     </div>
-    <a href="/dashboard" class="px-3 py-1.5 bg-slate-800 text-slate-300 rounded-xl text-xs font-semibold hover:bg-slate-700 transition-all border border-slate-700">Back</a>
-  </div>
+  </header>
 
-  <!-- Main Container -->
-  <div class="max-w-md w-full mx-auto space-y-6 my-auto">
+  <main class="max-w-md mx-auto p-4 mt-5">
 
-    <!-- Flash Messages -->
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
         {% for category, message in messages %}
-          <div class="p-3 rounded-2xl text-center text-xs font-semibold border {% if category == 'error' %}bg-rose-500/10 border-rose-500/30 text-rose-400{% else %}bg-emerald-500/10 border-emerald-500/30 text-emerald-400{% endif %}">
+          <div class="mb-4 p-3 rounded-xl text-sm border
+            {% if category == 'error' %}
+              bg-red-500/10 border-red-500/30 text-red-400
+            {% else %}
+              bg-green-500/10 border-green-500/30 text-green-400
+            {% endif %}">
             {{ message }}
           </div>
         {% endfor %}
       {% endif %}
     {% endwith %}
 
-    <!-- Balance Summary Card -->
-    <div class="bg-gradient-to-br from-[#1a1f2c] to-[#151922] border border-purple-500/30 rounded-3xl p-6 text-center space-y-2 shadow-2xl">
-      <p class="text-xs font-bold uppercase tracking-wider text-slate-400">Available Balance</p>
-      <h2 class="text-4xl font-black text-white tracking-tight">{{ points }} <span class="text-lg font-bold text-purple-400">Poly Points</span></h2>
-      <p class="text-sm font-semibold text-emerald-400">≈ ${{ usd_value }} USDT</p>
-      <p class="text-[11px] text-slate-400 pt-2 border-t border-slate-800">Rate: 4,000 Poly Points = $20 | Min: $30 ({{ min_points }} Points)</p>
-    </div>
+    <h2 class="text-2xl font-bold">Convert Your Points</h2>
+    <p class="text-gray-400 text-sm mt-2">
+      Convert your Poly Points into your internal USD balance.
+    </p>
 
-    <!-- Redeem Form -->
-    <form action="/redeem" method="POST" class="bg-[#151922] border border-slate-800 rounded-3xl p-6 space-y-4 shadow-xl">
-      <div class="space-y-1.5">
-        <label class="text-xs font-bold uppercase tracking-wider text-slate-400">USDT (TRC20) Wallet Address</label>
-        <input type="text" name="wallet_address" required placeholder="Enter your USDT wallet address" class="w-full bg-[#0b0e14] border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-purple-500">
+    <div class="bg-gradient-to-br from-purple-900/40 to-[#151b28]
+                border border-purple-500/30 rounded-2xl p-5 mt-6">
+
+      <p class="text-gray-400 text-sm">Available Points</p>
+
+      <h3 class="text-3xl font-bold mt-2">
+        {{ points }} <span class="text-purple-400 text-lg">Points</span>
+      </h3>
+
+      <div class="border-t border-gray-700 mt-4 pt-4">
+        <p class="text-gray-400 text-sm">Estimated USD Value</p>
+        <p class="text-2xl font-bold text-green-400 mt-1">
+          ${{ "%.2f"|format((points|float) / 200) }}
+        </p>
       </div>
 
-      <button type="submit" class="w-full py-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-extrabold rounded-2xl shadow-lg shadow-purple-600/30 transition-all text-sm">
-        Request Payout ($30 Minimum)
-      </button>
-    </form>
+      <p class="text-xs text-gray-400 mt-4">
+        Conversion rate: 200 points = $1.00
+      </p>
+    </div>
 
-  </div>
+    <div class="bg-[#151b28] border border-gray-800 rounded-2xl p-5 mt-5">
+      <h3 class="font-bold">Redeem Points</h3>
 
-  <div class="max-w-md w-full mx-auto text-center text-xs text-slate-600 pb-2">
-    Poly Earn &copy; 2026. Secure Crypto Payouts.
-  </div>
+      <p class="text-gray-400 text-sm mt-2">
+        Minimum redemption is 100 points ($0.50).
+        Your points will be deducted and the equivalent amount
+        will be added to your USD balance.
+      </p>
+
+      <form action="{{ url_for('redeem') }}" method="POST" class="mt-5">
+
+        <label for="points"
+               class="block text-sm font-semibold mb-2">
+          Points to Redeem
+        </label>
+
+        <input
+          type="number"
+          id="points"
+          name="points"
+          min="100"
+          step="2"
+          max="{{ points }}"
+          required
+          placeholder="Enter points (minimum 100)"
+          class="w-full bg-[#0b0e14] border border-gray-700
+                 rounded-xl px-4 py-3 outline-none
+                 focus:border-purple-500"
+          oninput="updateValue()"
+        >
+
+        <div class="bg-[#0b0e14] border border-gray-800
+                    rounded-xl p-4 mt-4">
+          <p class="text-gray-400 text-sm">You will receive</p>
+          <p id="usdValue" class="text-2xl font-bold text-green-400 mt-1">
+            $0.00
+          </p>
+        </div>
+
+        <p class="text-xs text-gray-500 mt-3">
+          Enter an even number of points to preserve exact cents.
+        </p>
+
+        <button
+          type="submit"
+          class="w-full bg-purple-600 hover:bg-purple-700
+                 rounded-xl py-3 mt-5 font-bold transition">
+          Redeem Points
+        </button>
+
+      </form>
+    </div>
+
+    <a href="{{ url_for('dashboard') }}"
+       class="block text-center text-gray-400 text-sm mt-6">
+      ← Back to Dashboard
+    </a>
+
+  </main>
+
+  <script>
+    function updateValue() {
+      const input = document.getElementById("points");
+      const value = Number(input.value);
+      const balance = Number({{ points|int }});
+      const output = document.getElementById("usdValue");
+
+      if (!input.value || value < 0) {
+        output.textContent = "$0.00";
+        return;
+      }
+
+      output.textContent = "$" + (value / 200).toFixed(2);
+    }
+  </script>
 
 </body>
 </html>
