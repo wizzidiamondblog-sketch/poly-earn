@@ -1,3 +1,4 @@
+
 import os
 import time
 import sqlite3
@@ -394,8 +395,7 @@ def login():
             conn.close()
 
     return render_template("login.html")
-
-
+                    
 @app.route("/admin-login", methods=["GET", "POST"])
 def admin_login():
     if not ADMIN_EMAIL:
@@ -426,7 +426,6 @@ def admin_login():
             )
 
             user = cursor.fetchone()
-
             success = bool(
                 email == ADMIN_EMAIL
                 and user
@@ -705,14 +704,13 @@ def withdraw():
         conn.close()
 
     return redirect(url_for("dashboard"))
-
-
+    
 @app.route("/admin")
 def admin_dashboard():
     if not is_admin_user():
         session.clear()
         flash("Please log in with your admin account.", "error")
-   return redirect(url_for("admin_login"))
+        return redirect(url_for("admin_login"))
 
     conn = get_db()
     cursor = conn.cursor()
@@ -736,7 +734,6 @@ def admin_dashboard():
         """)
         users = cursor.fetchall()
 
-        # Keep the withdrawal fields in the order expected by admin.html.
         cursor.execute("""
             SELECT withdrawals.id,
                    users.username,
@@ -769,7 +766,10 @@ def admin_dashboard():
         conn.close()
 
 
-@app.route("/admin/withdrawal/<int:withdrawal_id>/<action>", methods=["POST"])
+@app.route(
+    "/admin/withdrawal/<int:withdrawal_id>/<action>",
+    methods=["POST"]
+)
 def process_withdrawal(withdrawal_id, action):
     if not is_admin_user():
         session.clear()
@@ -836,7 +836,6 @@ def process_withdrawal(withdrawal_id, action):
             (new_status, processed_at, withdrawal_id)
         )
 
-        # Rejected withdrawals return the points to the user's balance.
         if action == "reject":
             cursor.execute(
                 f"""
@@ -852,7 +851,10 @@ def process_withdrawal(withdrawal_id, action):
         if action == "approve":
             flash("Withdrawal approved successfully.", "success")
         else:
-            flash("Withdrawal rejected. Points returned to the user.", "success")
+            flash(
+                "Withdrawal rejected. Points returned to the user.",
+                "success"
+            )
 
     except Exception:
         conn.rollback()
@@ -906,4 +908,5 @@ def logout():
 
 
 # Initialize database tables on application startup.
-init_db()     
+init_db()
+        
