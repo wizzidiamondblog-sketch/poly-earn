@@ -1,0 +1,78 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Poly Earn Admin Login</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            background: #061b16;
+            color: #ecfdf5;
+            font-family: Arial, sans-serif;
+        }
+        .login {
+            width: 100%;
+            max-width: 400px;
+            padding: 28px;
+            background: #0c2b22;
+            border: 1px solid #176b4d;
+            border-radius: 16px;
+        }
+        h2 { color: #34d399; margin-top: 0; }
+        p { color: #b7d8ca; }
+        label { display: block; margin-top: 16px; }
+        input {
+            width: 100%;
+            padding: 13px;
+            margin-top: 7px;
+            border: 1px solid #28634e;
+            border-radius: 8px;
+            background: #061b16;
+            color: white;
+        }
+        button {
+            width: 100%;
+            padding: 13px;
+            margin-top: 22px;
+            border: 0;
+            border-radius: 8px;
+            background: #10b981;
+            color: #052e22;
+            font-weight: bold;
+        }
+        .message { color: #fca5a5; }
+    </style>
+</head>
+<body>
+    <main class="login">
+        <h2>Poly Earn Admin</h2>
+        <p>Sign in to manage your platform.</p>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% for category, message in messages %}
+            <p class="message">{{ message }}</p>
+          {% endfor %}
+        {% endwith %}
+
+        <form method="POST" action="{{ url_for('admin_login') }}">
+            <label for="email">Admin email</label>
+            <input id="email" type="email" name="email"
+                   autocomplete="username" required>
+
+            <label for="password">Password</label>
+            <input id="password" type="password" name="password"
+                   autocomplete="current-password" required>
+
+            <button type="submit">Sign in</button>
+        </form>
+    </main>
+</body>
+</html>
