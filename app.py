@@ -1,3 +1,4 @@
+
 import os
 import time
 import sqlite3
@@ -5,7 +6,10 @@ import logging
 import psycopg2
 
 from datetime import datetime, timedelta
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask import (
+    Flask, render_template, request, redirect,
+    url_for, session, flash
+)
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
@@ -13,7 +17,9 @@ app.secret_key = os.environ.get("SECRET_KEY") or os.urandom(32)
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+    DATABASE_URL = DATABASE_URL.replace(
+        "postgres://", "postgresql://", 1
+    )
 
 ADMIN_EMAIL = (os.environ.get("ADMIN_EMAIL") or "").strip().lower()
 
@@ -63,7 +69,8 @@ def init_db():
             """)
             cursor.execute("""
                 ALTER TABLE users
-                ADD COLUMN IF NOT EXISTS ads_watched_count INTEGER NOT NULL DEFAULT 0
+                ADD COLUMN IF NOT EXISTS ads_watched_count
+                INTEGER NOT NULL DEFAULT 0
             """)
             cursor.execute("""
                 ALTER TABLE users
@@ -71,7 +78,8 @@ def init_db():
             """)
             cursor.execute("""
                 ALTER TABLE users
-                ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE
+                ADD COLUMN IF NOT EXISTS is_admin
+                BOOLEAN NOT NULL DEFAULT FALSE
             """)
 
             cursor.execute("""
@@ -82,6 +90,17 @@ def init_db():
                     status VARCHAR(20) NOT NULL DEFAULT 'pending',
                     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     processed_at TIMESTAMP
+                )
+            """)
+
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS admin_login_history (
+                    id SERIAL PRIMARY KEY,
+                    email VARCHAR(120) NOT NULL,
+                    success BOOLEAN NOT NULL,
+                    ip_address TEXT,
+                    user_agent TEXT,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
                 )
             """)
 
@@ -125,9 +144,21 @@ def init_db():
                 )
             """)
 
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS admin_login_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    email TEXT NOT NULL,
+                    success INTEGER NOT NULL,
+                    ip_address TEXT,
+                    user_agent TEXT,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
         if ADMIN_EMAIL:
             placeholder = "%s" if DATABASE_URL else "?"
             admin_value = "TRUE" if DATABASE_URL else "1"
+
             cursor.execute(
                 f"UPDATE users SET is_admin = {admin_value} "
                 f"WHERE LOWER(email) = {placeholder}",
@@ -145,6 +176,50 @@ def init_db():
     finally:
         cursor.close()
         conn.close()
+
+
+def record_admin_login_attempt(email, success):
+    """Record login attempts for the configured admin email only."""
+    normalized_email = (email or "").strip().lower()
+
+    if not ADMIN_EMAIL or normalized_email != ADMIN_EMAIL:
+        return
+
+    conn = None
+    cursor = None
+
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+
+        placeholder = "%s" if DATABASE_URL else "?"
+
+        cursor.execute(
+            f"""
+            INSERT INTO admin_login_history
+                (email, success, ip_address, user_agent)
+            VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder})
+            """,
+            (
+                normalized_email,
+                bool(success) if DATABASE_URL else int(bool(success)),
+                request.remote_addr,
+                (request.headers.get("User-Agent") or "")[:250]
+            )
+        )
+
+        conn.commit()
+
+    except Exception:
+        if conn:
+            conn.rollback()
+        app.logger.exception("Could not record admin login attempt.")
+
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 
 def parse_datetime(value):
@@ -175,7 +250,10 @@ def is_admin_user():
         )
         row = cursor.fetchone()
 
-        return bool(row and row[0] and row[0].strip().lower() == ADMIN_EMAIL)
+        return bool(
+            row and row[0]
+            and row[0].strip().lower() == ADMIN_EMAIL
+        )
 
     except Exception:
         app.logger.exception("Admin authorization check failed.")
@@ -194,8 +272,10 @@ def get_user_ad_status(user_id):
 
     try:
         p = "%s" if DATABASE_URL else "?"
+
         cursor.execute(
-            f"SELECT ads_watched_count, last_ad_time FROM users WHERE id = {p}",
+            f"SELECT ads_watched_count, last_ad_time "
+            f"FROM users WHERE id = {p}",
             (user_id,)
         )
         row = cursor.fetchone()
@@ -253,7 +333,8 @@ def register():
         try:
             p = "%s" if DATABASE_URL else "?"
             cursor.execute(
-                f"INSERT INTO users (username, email, password) VALUES ({p}, {p}, {p})",
+                f"INSERT INTO users (username, email, password) "
+                f"VALUES ({p}, {p}, {p})",
                 (username, email, generate_password_hash(password))
             )
             conn.commit()
@@ -263,7 +344,10 @@ def register():
         except Exception:
             conn.rollback()
             app.logger.exception("Registration failed.")
-            flash("Registration failed. Username or email may already exist.", "error")
+            flash(
+                "Registration failed. Username or email may already exist.",
+                "error"
+            )
 
         finally:
             cursor.close()
@@ -283,13 +367,21 @@ def login():
 
         try:
             p = "%s" if DATABASE_URL else "?"
+
             cursor.execute(
-                f"SELECT id, username, email, password FROM users WHERE email = {p}",
+                f"SELECT id, username, email, password "
+                f"FROM users WHERE email = {p}",
                 (email,)
             )
             user = cursor.fetchone()
 
-            if user and check_password_hash(user[3], password):
+            login_ok = bool(
+                user and check_password_hash(user[3], password)
+            )
+
+            record_admin_login_attempt(email, login_ok)
+
+            if login_ok:
                 session.clear()
                 session["user_id"] = user[0]
                 session["username"] = user[1]
@@ -318,8 +410,10 @@ def dashboard():
 
     try:
         p = "%s" if DATABASE_URL else "?"
+
         cursor.execute(
-            f"SELECT points, ads_watched_count, last_ad_time FROM users WHERE id = {p}",
+            f"SELECT points, ads_watched_count, last_ad_time "
+            f"FROM users WHERE id = {p}",
             (session["user_id"],)
         )
         row = cursor.fetchone()
@@ -372,7 +466,10 @@ def watch_ad():
             return redirect(url_for("login"))
 
         if status[0] >= MAX_ADS:
-            flash("You have reached 25 ads in this 2-hour window.", "error")
+            flash(
+                "You have reached 25 ads in this 2-hour window.",
+                "error"
+            )
             return redirect(url_for("dashboard"))
 
         session["ad_page_opened_at"] = time.time()
@@ -440,7 +537,8 @@ def claim_reward():
 
         cursor.execute(
             f"UPDATE users SET points = points + {p}, "
-            f"ads_watched_count = {p}, last_ad_time = {p} WHERE id = {p}",
+            f"ads_watched_count = {p}, last_ad_time = {p} "
+            f"WHERE id = {p}",
             (POINTS_PER_AD, count + 1, timestamp, session["user_id"])
         )
 
@@ -493,17 +591,24 @@ def withdraw():
 
         if points < MIN_WITHDRAWAL_POINTS:
             conn.rollback()
-            flash("Minimum withdrawal is 6,000 points ($30).", "error")
+            flash(
+                "Minimum withdrawal is 6,000 points ($30).",
+                "error"
+            )
             return redirect(url_for("dashboard"))
 
         cursor.execute(
-            f"SELECT id FROM withdrawals WHERE user_id = {p} AND status = 'pending'",
+            f"SELECT id FROM withdrawals "
+            f"WHERE user_id = {p} AND status = 'pending'",
             (session["user_id"],)
         )
 
         if cursor.fetchone():
             conn.rollback()
-            flash("You already have a pending withdrawal request.", "error")
+            flash(
+                "You already have a pending withdrawal request.",
+                "error"
+            )
             return redirect(url_for("dashboard"))
 
         cursor.execute(
@@ -511,7 +616,8 @@ def withdraw():
             (points, session["user_id"])
         )
         cursor.execute(
-            f"INSERT INTO withdrawals (user_id, points, status) VALUES ({p}, {p}, 'pending')",
+            f"INSERT INTO withdrawals (user_id, points, status) "
+            f"VALUES ({p}, {p}, 'pending')",
             (session["user_id"], points)
         )
 
@@ -536,7 +642,10 @@ def admin_dashboard():
         return redirect(url_for("login"))
 
     if not is_admin_user():
-        flash("You are not authorized to access the admin dashboard.", "error")
+        flash(
+            "You are not authorized to access the admin dashboard.",
+            "error"
+        )
         return redirect(url_for("dashboard"))
 
     conn = get_db()
@@ -544,12 +653,14 @@ def admin_dashboard():
 
     try:
         cursor.execute(
-            "SELECT id, username, email, points FROM users ORDER BY id DESC"
+            "SELECT id, username, email, points "
+            "FROM users ORDER BY id DESC"
         )
         users = cursor.fetchall()
 
         cursor.execute("""
-            SELECT w.id, u.username, u.email, w.points, w.status, w.created_at
+            SELECT w.id, u.username, u.email, w.points,
+                   w.status, w.created_at
             FROM withdrawals w
             JOIN users u ON u.id = w.user_id
             ORDER BY w.id DESC
@@ -572,92 +683,23 @@ def admin_dashboard():
         conn.close()
 
 
-@app.route("/admin/withdrawal/<int:withdrawal_id>/<action>", methods=["POST"])
-def process_withdrawal(withdrawal_id, action):
+@app.route("/admin/login-history")
+def admin_login_history():
     if "user_id" not in session:
         return redirect(url_for("login"))
 
     if not is_admin_user():
-        flash("Unauthorized action.", "error")
+        flash("Unauthorized access.", "error")
         return redirect(url_for("dashboard"))
-
-    if action not in ("approve", "reject"):
-        flash("Invalid action.", "error")
-        return redirect(url_for("admin_dashboard"))
 
     conn = get_db()
     cursor = conn.cursor()
-    p = "%s" if DATABASE_URL else "?"
 
     try:
-        if not DATABASE_URL:
-            cursor.execute("BEGIN IMMEDIATE")
-
-        lock = " FOR UPDATE" if DATABASE_URL else ""
-        cursor.execute(
-            f"SELECT user_id, points, status FROM withdrawals WHERE id = {p}{lock}",
-            (withdrawal_id,)
-        )
-        row = cursor.fetchone()
-
-        if not row:
-            conn.rollback()
-            flash("Withdrawal request not found.", "error")
-            return redirect(url_for("admin_dashboard"))
-
-        user_id, points, status = row
-
-        if status != "pending":
-            conn.rollback()
-            flash("This request has already been processed.", "error")
-            return redirect(url_for("admin_dashboard"))
-
-        new_status = "approved" if action == "approve" else "rejected"
-
-        if action == "reject":
-            cursor.execute(
-                f"UPDATE users SET points = points + {p} WHERE id = {p}",
-                (points, user_id)
-            )
-
-        cursor.execute(
-            f"UPDATE withdrawals SET status = {p}, "
-            f"processed_at = CURRENT_TIMESTAMP WHERE id = {p}",
-            (new_status, withdrawal_id)
-        )
-
-        conn.commit()
-        flash(
-            "Request approved. Arrange the payout separately."
-            if action == "approve"
-            else "Request rejected and points returned.",
-            "success"
-        )
-
-    except Exception:
-        conn.rollback()
-        app.logger.exception("Withdrawal processing failed.")
-        flash("Could not process this withdrawal request.", "error")
-
-    finally:
-        cursor.close()
-        conn.close()
-
-    return redirect(url_for("admin_dashboard"))
-
-
-@app.route("/logout")
-def logout():
-    session.clear()
-    return redirect(url_for("login"))
-
-
-init_db()
-
-
-if __name__ == "__main__":
-    app.run(
-        host="0.0.0.0",
-        port=int(os.environ.get("PORT", 5000)),
-        debug=False
-    )
+        cursor.execute("""
+            SELECT id, email, success, ip_address,
+                   user_agent, created_at
+            FROM admin_login_history
+            ORDER BY id DESC
+            LIMIT 200
+        """
