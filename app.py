@@ -712,4 +712,198 @@ def admin_dashboard():
     if not is_admin_user():
         session.clear()
         flash("Please log in with your admin account.", "error")
-  
+   return redirect(url_for("admin_login"))
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("SELECT COUNT(*) FROM users")
+        total_users = cursor.fetchone()[0]
+
+        cursor.execute(
+            "SELECT COUNT(*) FROM withdrawals WHERE status = 'pending'"
+        )
+        pending_withdrawals = cursor.fetchone()[0]
+
+        cursor.execute("SELECT COALESCE(SUM(points), 0) FROM users")
+        total_points = cursor.fetchone()[0]
+
+        cursor.execute("""
+            SELECT id, username, email, points
+            FROM users
+            ORDER BY id DESC
+        """)
+        users = cursor.fetchall()
+
+        # Keep the withdrawal fields in the order expected by admin.html.
+        cursor.execute("""
+            SELECT withdrawals.id,
+                   users.username,
+                   users.email,
+                   withdrawals.points,
+                   withdrawals.status,
+                   withdrawals.created_at
+            FROM withdrawals
+            JOIN users ON users.id = withdrawals.user_id
+            ORDER BY withdrawals.id DESC
+        """)
+        withdrawals = cursor.fetchall()
+
+        return render_template(
+            "admin.html",
+            total_users=total_users,
+            pending_withdrawals=pending_withdrawals,
+            total_points=total_points,
+            users=users,
+            withdrawals=withdrawals
+        )
+
+    except Exception:
+        app.logger.exception("Admin dashboard failed.")
+        flash("Could not load the admin dashboard.", "error")
+        return redirect(url_for("admin_login"))
+
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@app.route("/admin/withdrawal/<int:withdrawal_id>/<action>", methods=["POST"])
+def process_withdrawal(withdrawal_id, action):
+    if not is_admin_user():
+        session.clear()
+        flash("Please log in with your admin account.", "error")
+        return redirect(url_for("admin_login"))
+
+    if action not in ("approve", "reject"):
+        flash("Invalid withdrawal action.", "error")
+        return redirect(url_for("admin_dashboard"))
+
+    conn = get_db()
+    cursor = conn.cursor()
+    p = "%s" if DATABASE_URL else "?"
+
+    try:
+        if DATABASE_URL:
+            cursor.execute(
+                f"""
+                SELECT user_id, points, status
+                FROM withdrawals
+                WHERE id = {p}
+                FOR UPDATE
+                """,
+                (withdrawal_id,)
+            )
+        else:
+            cursor.execute("BEGIN IMMEDIATE")
+            cursor.execute(
+                f"""
+                SELECT user_id, points, status
+                FROM withdrawals
+                WHERE id = {p}
+                """,
+                (withdrawal_id,)
+            )
+
+        withdrawal = cursor.fetchone()
+
+        if not withdrawal:
+            conn.rollback()
+            flash("Withdrawal request not found.", "error")
+            return redirect(url_for("admin_dashboard"))
+
+        user_id, points, status = withdrawal
+
+        if status != "pending":
+            conn.rollback()
+            flash("This withdrawal has already been processed.", "error")
+            return redirect(url_for("admin_dashboard"))
+
+        new_status = "approved" if action == "approve" else "rejected"
+        processed_at = (
+            datetime.now()
+            if DATABASE_URL
+            else datetime.now().isoformat(sep=" ")
+        )
+
+        cursor.execute(
+            f"""
+            UPDATE withdrawals
+            SET status = {p}, processed_at = {p}
+            WHERE id = {p}
+            """,
+            (new_status, processed_at, withdrawal_id)
+        )
+
+        # Rejected withdrawals return the points to the user's balance.
+        if action == "reject":
+            cursor.execute(
+                f"""
+                UPDATE users
+                SET points = points + {p}
+                WHERE id = {p}
+                """,
+                (points, user_id)
+            )
+
+        conn.commit()
+
+        if action == "approve":
+            flash("Withdrawal approved successfully.", "success")
+        else:
+            flash("Withdrawal rejected. Points returned to the user.", "success")
+
+    except Exception:
+        conn.rollback()
+        app.logger.exception("Withdrawal processing failed.")
+        flash("Could not process this withdrawal.", "error")
+
+    finally:
+        cursor.close()
+        conn.close()
+
+    return redirect(url_for("admin_dashboard"))
+
+
+@app.route("/admin-login-history")
+def admin_login_history():
+    if not is_admin_user():
+        return redirect(url_for("admin_login"))
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("""
+            SELECT email, success, ip_address, user_agent, created_at
+            FROM admin_login_history
+            ORDER BY id DESC
+            LIMIT 100
+        """)
+        attempts = cursor.fetchall()
+
+        return render_template(
+            "admin_login_history.html",
+            attempts=attempts
+        )
+
+    except Exception:
+        app.logger.exception("Admin login history failed.")
+        flash("Could not load admin login history.", "error")
+        return redirect(url_for("admin_dashboard"))
+
+    finally:
+        cursor.close()
+        conn.close()
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    flash("You have been logged out.", "success")
+    return redirect(url_for("login"))
+
+
+# Initialize database tables on application startup.
+init_db()     
