@@ -11,6 +11,7 @@
 
 <body class="bg-[#0b0e14] text-white min-h-screen pb-24 font-sans">
 
+  <!-- HEADER -->
   <header class="sticky top-0 z-40 bg-[#0b0e14]/95 backdrop-blur border-b border-slate-800">
     <div class="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
       <a href="/dashboard"
@@ -30,6 +31,7 @@
 
   <main class="max-w-5xl mx-auto p-4 md:p-6 space-y-6">
 
+    <!-- FLASH MESSAGES -->
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
         {% for category, message in messages %}
@@ -45,6 +47,7 @@
       {% endif %}
     {% endwith %}
 
+    <!-- WELCOME -->
     <section class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
       <div>
         <p class="text-sm text-slate-400">Welcome back,</p>
@@ -100,21 +103,19 @@
           <div class="text-3xl">💵</div>
         </div>
 
-        <!-- EXISTING REDEEM BUTTON - UNCHANGED -->
+        <!-- REDEEM POINTS -->
         <a href="/redeem"
            class="block text-center mt-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 font-bold text-sm">
           Redeem Points
         </a>
 
-        <!-- NEW WITHDRAW BUTTON -->
+        <!-- WITHDRAW FUNDS -->
         <a href="/withdraw"
            class="block text-center mt-3 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 font-bold text-sm">
           💸 Withdraw Funds
         </a>
 
-        <p class="text-xs text-slate-400 text-center mt-3">
-          Minimum withdrawal $50 · At least 3 active referrals required
-        </p>
+        <!-- Minimum withdrawal message intentionally removed from dashboard -->
       </div>
 
     </section>
@@ -225,7 +226,6 @@
         <span class="text-[10px]">Invite</span>
       </a>
 
-      <!-- EXISTING REDEEM NAVIGATION - UNCHANGED -->
       <a href="/redeem" class="flex flex-col items-center gap-1 text-slate-400 hover:text-white py-1">
         <span class="text-xl">💳</span>
         <span class="text-[10px]">Redeem</span>
@@ -240,5 +240,5 @@
   </nav>
 
 </body>
-  </html>
-  
+          </html>
+          
