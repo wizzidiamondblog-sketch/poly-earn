@@ -317,9 +317,8 @@ def get_user_ad_status(user_id):
 
         count = row[0] or 0
         window_start = parse_datetime(row[1])
-        now = datetime.now()
 
-        if window_start and now - window_start >= AD_WINDOW:
+        if window_start and datetime.now() - window_start >= AD_WINDOW:
             cursor.execute(
                 f"""
                 UPDATE users
@@ -378,14 +377,15 @@ def record_admin_login_attempt(email, success):
         if cursor:
             cursor.close()
         if conn:
-            conn.close()@app.route("/")
+            conn.close()
+
+
+@app.route("/")
 def home():
     if "user_id" in session:
         return redirect(url_for("dashboard"))
     return redirect(url_for("login"))
-
-
-@app.route("/register", methods=["GET", "POST"])
+    @app.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "GET":
         code = (request.args.get("ref") or "").strip().upper()
@@ -620,7 +620,6 @@ def dashboard():
             )
             conn.commit()
             count = 0
-            window_start = None
 
         usd_value = float(
             (Decimal(points) * Decimal("0.005")).quantize(
@@ -644,7 +643,8 @@ def dashboard():
 
     finally:
         cursor.close()
-        conn.close()@app.route("/watch-ad")
+        conn.close()
+        @app.route("/watch-ad")
 def watch_ad():
     if "user_id" not in session:
         return redirect(url_for("login"))
@@ -692,10 +692,8 @@ def watch_ad():
             flash("You have reached 25 ads in this 2-hour window.", "error")
             return redirect(url_for("tasks"))
 
-        # Start the two-hour window when the first ad page opens.
         if window_start is None:
             timestamp = now if DATABASE_URL else now.isoformat(sep=" ")
-
             cursor.execute(
                 f"""
                 UPDATE users
@@ -762,7 +760,6 @@ def claim_reward():
             session.clear()
             return redirect(url_for("login"))
 
-        points = row[0] or 0
         count = row[1] or 0
         window_start = parse_datetime(row[2])
         now = datetime.now()
@@ -777,7 +774,6 @@ def claim_reward():
             flash("You have reached the 25-ad limit.", "error")
             return redirect(url_for("tasks"))
 
-        # Start a fresh window if the previous one expired.
         if window_start is None:
             window_start = now
 
@@ -1037,7 +1033,8 @@ def redeem():
 
     finally:
         cursor.close()
-        conn.close()@app.route("/profile")
+        conn.close()
+        @app.route("/profile")
 def profile():
     if "user_id" not in session:
         return redirect(url_for("login"))
@@ -1061,10 +1058,7 @@ def profile():
             session.clear()
             return redirect(url_for("login"))
 
-        return render_template(
-            "profile.html",
-            user=user
-        )
+        return render_template("profile.html", user=user)
 
     except Exception:
         app.logger.exception("Profile page failed.")
