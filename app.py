@@ -18,7 +18,9 @@ app.secret_key = os.environ.get("SECRET_KEY") or os.urandom(32)
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+    DATABASE_URL = DATABASE_URL.replace(
+        "postgres://", "postgresql://", 1
+    )
 
 ADMIN_EMAIL = (os.environ.get("ADMIN_EMAIL") or "").strip().lower()
 
@@ -27,7 +29,10 @@ AD_WINDOW = timedelta(hours=2)
 POINTS_PER_AD = 3
 REFERRAL_POINTS = 50
 MIN_REDEEM_POINTS = 100
-MIN_WITHDRAWAL_POINTS = 6000
+MIN_WITHDRAWAL_USD = Decimal("50.00")
+MIN_ACTIVE_REFERRALS = 3
+WITHDRAWAL_TOKEN = "USDT"
+WITHDRAWAL_NETWORK = "Polygon"
 
 logging.basicConfig(level=logging.INFO)
 
@@ -35,9 +40,7 @@ logging.basicConfig(level=logging.INFO)
 def get_db():
     if DATABASE_URL:
         return psycopg2.connect(
-            DATABASE_URL,
-            sslmode="require",
-            connect_timeout=10
+            DATABASE_URL, sslmode="require", connect_timeout=10
         )
 
     conn = sqlite3.connect("poly_earn.db", timeout=15)
@@ -53,8 +56,10 @@ def new_referral_code():
     return secrets.token_hex(5).upper()
 
 
-def record_transaction(cursor, user_id, kind, points_change=0,
-                       usd_change=0, description=""):
+def record_transaction(
+    cursor, user_id, kind, points_change=0,
+    usd_change=0, description=""
+):
     p = placeholder()
     cursor.execute(
         f"""
@@ -108,19 +113,35 @@ def init_db():
 
             for name, definition in migrations:
                 cursor.execute(
-                    f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {name} {definition}"
+                    f"ALTER TABLE users ADD COLUMN IF NOT EXISTS "
+                    f"{name} {definition}"
                 )
 
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS withdrawals (
                     id SERIAL PRIMARY KEY,
                     user_id INTEGER NOT NULL REFERENCES users(id),
-                    points INTEGER NOT NULL,
+                    points INTEGER NOT NULL DEFAULT 0,
                     status VARCHAR(20) NOT NULL DEFAULT 'pending',
                     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    processed_at TIMESTAMP
+                    processed_at TIMESTAMP,
+                    amount_usd NUMERIC(12,2) NOT NULL DEFAULT 0,
+                    wallet_address TEXT,
+                    token VARCHAR(20) NOT NULL DEFAULT 'USDT',
+                    network VARCHAR(30) NOT NULL DEFAULT 'Polygon'
                 )
             """)
+
+            for name, definition in [
+                ("amount_usd", "NUMERIC(12,2) NOT NULL DEFAULT 0"),
+                ("wallet_address", "TEXT"),
+                ("token", "VARCHAR(20) NOT NULL DEFAULT 'USDT'"),
+                ("network", "VARCHAR(30) NOT NULL DEFAULT 'Polygon'")
+            ]:
+                cursor.execute(
+                    f"ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS "
+                    f"{name} {definition}"
+                )
 
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS admin_login_history (
@@ -168,7 +189,7 @@ def init_db():
             cursor.execute("PRAGMA table_info(users)")
             columns = {row[1] for row in cursor.fetchall()}
 
-            migrations = [
+            for name, definition in [
                 ("points", "INTEGER NOT NULL DEFAULT 0"),
                 ("ads_watched_count", "INTEGER NOT NULL DEFAULT 0"),
                 ("last_ad_time", "TEXT"),
@@ -178,25 +199,43 @@ def init_db():
                 ("referral_code", "TEXT"),
                 ("referred_by", "INTEGER"),
                 ("created_at", "TEXT")
-            ]
-
-            for name, definition in migrations:
+            ]:
                 if name not in columns:
                     cursor.execute(
-                        f"ALTER TABLE users ADD COLUMN {name} {definition}"
+                        f"ALTER TABLE users ADD COLUMN "
+                        f"{name} {definition}"
                     )
 
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS withdrawals (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     user_id INTEGER NOT NULL,
-                    points INTEGER NOT NULL,
+                    points INTEGER NOT NULL DEFAULT 0,
                     status TEXT NOT NULL DEFAULT 'pending',
                     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     processed_at TEXT,
+                    amount_usd NUMERIC NOT NULL DEFAULT 0,
+                    wallet_address TEXT,
+                    token TEXT NOT NULL DEFAULT 'USDT',
+                    network TEXT NOT NULL DEFAULT 'Polygon',
                     FOREIGN KEY (user_id) REFERENCES users(id)
                 )
             """)
+
+            cursor.execute("PRAGMA table_info(withdrawals)")
+            columns = {row[1] for row in cursor.fetchall()}
+
+            for name, definition in [
+                ("amount_usd", "NUMERIC NOT NULL DEFAULT 0"),
+                ("wallet_address", "TEXT"),
+                ("token", "TEXT NOT NULL DEFAULT 'USDT'"),
+                ("network", "TEXT NOT NULL DEFAULT 'Polygon'")
+            ]:
+                if name not in columns:
+                    cursor.execute(
+                        f"ALTER TABLE withdrawals ADD COLUMN "
+                        f"{name} {definition}"
+                    )
 
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS admin_login_history (
@@ -223,14 +262,11 @@ def init_db():
             """)
 
         cursor.execute("SELECT id, referral_code FROM users")
-        existing_users = cursor.fetchall()
-
-        for user in existing_users:
+        for user in cursor.fetchall():
             if not user[1]:
-                code = new_referral_code()
                 cursor.execute(
                     f"UPDATE users SET referral_code = {p} WHERE id = {p}",
-                    (code, user[0])
+                    (new_referral_code(), user[0])
                 )
 
         cursor.execute("""
@@ -241,10 +277,8 @@ def init_db():
         if ADMIN_EMAIL:
             admin_value = "TRUE" if DATABASE_URL else "1"
             cursor.execute(
-                f"""
-                UPDATE users SET is_admin = {admin_value}
-                WHERE LOWER(email) = {p}
-                """,
+                f"UPDATE users SET is_admin = {admin_value} "
+                f"WHERE LOWER(email) = {p}",
                 (ADMIN_EMAIL,)
             )
 
@@ -264,8 +298,10 @@ def init_db():
 def parse_datetime(value):
     if not value:
         return None
+
     if isinstance(value, datetime):
         return value.replace(tzinfo=None)
+
     try:
         return datetime.fromisoformat(str(value))
     except (ValueError, TypeError):
@@ -310,16 +346,15 @@ def get_user_ad_status(user_id):
             """,
             (user_id,)
         )
-        row = cursor.fetchone()
 
+        row = cursor.fetchone()
         if not row:
             return None
 
-        count = row[0] or 0
+        count = int(row[0] or 0)
         window_start = parse_datetime(row[1])
-        now = datetime.now()
 
-        if window_start and now - window_start >= AD_WINDOW:
+        if window_start and datetime.now() - window_start >= AD_WINDOW:
             cursor.execute(
                 f"""
                 UPDATE users
@@ -338,6 +373,27 @@ def get_user_ad_status(user_id):
     finally:
         cursor.close()
         conn.close()
+
+
+def count_active_referrals(cursor, user_id):
+    p = placeholder()
+    cursor.execute(
+        f"""
+        SELECT COUNT(DISTINCT u.id)
+        FROM users u
+        WHERE u.referred_by = {p}
+          AND EXISTS (
+              SELECT 1
+              FROM transactions t
+              WHERE t.user_id = u.id
+                AND t.type = 'ad_reward'
+                AND t.points_change > 0
+          )
+        """,
+        (user_id,)
+    )
+    row = cursor.fetchone()
+    return int(row[0] or 0)
 
 
 def record_admin_login_attempt(email, success):
@@ -379,7 +435,9 @@ def record_admin_login_attempt(email, success):
             cursor.close()
         if conn:
             conn.close()
-            @app.route("/")
+
+
+@app.route("/")
 def home():
     if "user_id" in session:
         return redirect(url_for("dashboard"))
@@ -428,6 +486,8 @@ def register():
             if inviter:
                 referred_by = inviter[0]
 
+        hashed_password = generate_password_hash(password)
+
         if DATABASE_URL:
             cursor.execute(
                 """
@@ -436,11 +496,7 @@ def register():
                 VALUES (%s, %s, %s, %s, %s)
                 RETURNING id
                 """,
-                (
-                    username, email,
-                    generate_password_hash(password),
-                    referral_code, referred_by
-                )
+                (username, email, hashed_password, referral_code, referred_by)
             )
             new_user_id = cursor.fetchone()[0]
         else:
@@ -450,11 +506,7 @@ def register():
                 (username, email, password, referral_code, referred_by)
                 VALUES (?, ?, ?, ?, ?)
                 """,
-                (
-                    username, email,
-                    generate_password_hash(password),
-                    referral_code, referred_by
-                )
+                (username, email, hashed_password, referral_code, referred_by)
             )
             new_user_id = cursor.lastrowid
 
@@ -507,7 +559,10 @@ def login():
                 (email,)
             )
             user = cursor.fetchone()
-            login_ok = bool(user and check_password_hash(user[3], password))
+            login_ok = bool(
+                user and check_password_hash(user[3], password)
+            )
+
             record_admin_login_attempt(email, login_ok)
 
             if login_ok:
@@ -533,7 +588,8 @@ def login():
 def admin_login():
     if not ADMIN_EMAIL:
         flash(
-            "Admin login is not configured. Set ADMIN_EMAIL in Render environment variables.",
+            "Admin login is not configured. Set ADMIN_EMAIL in Render "
+            "environment variables.",
             "error"
         )
         return render_template("admin_login.html")
@@ -556,9 +612,11 @@ def admin_login():
             )
             user = cursor.fetchone()
             success = bool(
-                email == ADMIN_EMAIL and user
+                email == ADMIN_EMAIL
+                and user
                 and check_password_hash(user[2], password)
             )
+
             record_admin_login_attempt(email, success)
 
             if success:
@@ -604,8 +662,8 @@ def dashboard():
             session.clear()
             return redirect(url_for("login"))
 
-        points = row[0] or 0
-        count = row[1] or 0
+        points = int(row[0] or 0)
+        count = int(row[1] or 0)
         window_start = parse_datetime(row[2])
         usd_balance = float(row[3] or 0)
 
@@ -621,7 +679,6 @@ def dashboard():
             )
             conn.commit()
             count = 0
-            window_start = None
 
         usd_value = float(
             (Decimal(points) * Decimal("0.005")).quantize(
@@ -646,7 +703,9 @@ def dashboard():
     finally:
         cursor.close()
         conn.close()
-        @app.route("/watch-ad")
+
+
+@app.route("/watch-ad")
 def watch_ad():
     if "user_id" not in session:
         return redirect(url_for("login"))
@@ -681,7 +740,7 @@ def watch_ad():
             session.clear()
             return redirect(url_for("login"))
 
-        count = row[0] or 0
+        count = int(row[0] or 0)
         window_start = parse_datetime(row[1])
         now = datetime.now()
 
@@ -691,13 +750,14 @@ def watch_ad():
 
         if count >= MAX_ADS:
             conn.rollback()
-            flash("You have reached 25 ads in this 2-hour window.", "error")
+            flash(
+                "You have reached 25 ads in this 2-hour window.",
+                "error"
+            )
             return redirect(url_for("tasks"))
 
-        # Start the two-hour window when the first ad page opens.
         if window_start is None:
             timestamp = now if DATABASE_URL else now.isoformat(sep=" ")
-
             cursor.execute(
                 f"""
                 UPDATE users
@@ -729,7 +789,6 @@ def claim_reward():
         return redirect(url_for("login"))
 
     opened_at = session.get("ad_page_opened_at")
-
     if opened_at is None or time.time() - opened_at < 10:
         flash("Please wait at least 10 seconds before claiming.", "error")
         return redirect(url_for("watch_ad"))
@@ -764,8 +823,7 @@ def claim_reward():
             session.clear()
             return redirect(url_for("login"))
 
-        points = row[0] or 0
-        count = row[1] or 0
+        count = int(row[1] or 0)
         window_start = parse_datetime(row[2])
         now = datetime.now()
 
@@ -779,7 +837,6 @@ def claim_reward():
             flash("You have reached the 25-ad limit.", "error")
             return redirect(url_for("tasks"))
 
-        # Start a fresh window if the previous one expired.
         if window_start is None:
             window_start = now
 
@@ -787,10 +844,7 @@ def claim_reward():
             window_start if DATABASE_URL
             else window_start.isoformat(sep=" ")
         )
-        ad_timestamp = (
-            now if DATABASE_URL
-            else now.isoformat(sep=" ")
-        )
+        ad_timestamp = now if DATABASE_URL else now.isoformat(sep=" ")
 
         cursor.execute(
             f"""
@@ -802,11 +856,8 @@ def claim_reward():
             WHERE id = {p}
             """,
             (
-                POINTS_PER_AD,
-                count + 1,
-                window_timestamp,
-                ad_timestamp,
-                session["user_id"]
+                POINTS_PER_AD, count + 1, window_timestamp,
+                ad_timestamp, session["user_id"]
             )
         )
 
@@ -849,8 +900,7 @@ def tasks():
     if window_start:
         elapsed = (datetime.now() - window_start).total_seconds()
         remaining_seconds = max(
-            0,
-            int(AD_WINDOW.total_seconds() - elapsed)
+            0, int(AD_WINDOW.total_seconds() - elapsed)
         )
 
     return render_template(
@@ -872,10 +922,7 @@ def invite():
 
     try:
         cursor.execute(
-            f"""
-            SELECT referral_code, points
-            FROM users WHERE id = {p}
-            """,
+            f"SELECT referral_code, points FROM users WHERE id = {p}",
             (session["user_id"],)
         )
         user = cursor.fetchone()
@@ -891,12 +938,17 @@ def invite():
         cursor.execute(
             f"""
             SELECT username, created_at
-            FROM users WHERE referred_by = {p}
+            FROM users
+            WHERE referred_by = {p}
             ORDER BY id DESC
             """,
             (session["user_id"],)
         )
         referrals = cursor.fetchall()
+
+        active_referrals = count_active_referrals(
+            cursor, session["user_id"]
+        )
 
         return render_template(
             "invite.html",
@@ -904,6 +956,7 @@ def invite():
             referral_link=referral_link,
             referrals=referrals,
             referral_count=len(referrals),
+            active_referrals=active_referrals,
             referral_points=REFERRAL_POINTS
         )
 
@@ -937,12 +990,16 @@ def redeem():
                 return redirect(url_for("redeem"))
 
             if points_to_redeem < MIN_REDEEM_POINTS:
-                flash("Minimum redemption is 100 points ($0.50).", "error")
+                flash(
+                    "Minimum redemption is 100 points ($0.50).",
+                    "error"
+                )
                 return redirect(url_for("redeem"))
 
             if points_to_redeem % 2 != 0:
                 flash(
-                    "Enter an even number of points to preserve the exact rate.",
+                    "Enter an even number of points to preserve "
+                    "the exact rate.",
                     "error"
                 )
                 return redirect(url_for("redeem"))
@@ -981,7 +1038,9 @@ def redeem():
 
             usd_amount = (
                 Decimal(points_to_redeem) * Decimal("0.005")
-            ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            ).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP
+            )
 
             cursor.execute(
                 f"""
@@ -1005,8 +1064,8 @@ def redeem():
 
             conn.commit()
             flash(
-                f"Redeemed {points_to_redeem} points into ${usd_amount:.2f} "
-                "in your Poly Earn USD wallet.",
+                f"Redeemed {points_to_redeem} points into "
+                f"${usd_amount:.2f} in your USD wallet.",
                 "success"
             )
             return redirect(url_for("redeem"))
@@ -1034,13 +1093,18 @@ def redeem():
     except Exception:
         conn.rollback()
         app.logger.exception("Redemption failed.")
-        flash("Could not process redemption. Please try again.", "error")
+        flash(
+            "Could not process redemption. Please try again.",
+            "error"
+        )
         return redirect(url_for("dashboard"))
 
     finally:
         cursor.close()
         conn.close()
-        @app.route("/profile")
+
+
+@app.route("/profile")
 def profile():
     if "user_id" not in session:
         return redirect(url_for("login"))
@@ -1064,10 +1128,7 @@ def profile():
             session.clear()
             return redirect(url_for("login"))
 
-        return render_template(
-            "profile.html",
-            user=user
-        )
+        return render_template("profile.html", user=user)
 
     except Exception:
         app.logger.exception("Profile page failed.")
@@ -1095,8 +1156,8 @@ def history():
                    description, created_at
             FROM transactions
             WHERE user_id = {p}
-            ORDER BY id DESC
-            LIMIT 200
+              AND type NOT IN ('usd_withdrawal')
+            ORDER BY id DESC LIMIT 200
             """,
             (session["user_id"],)
         )
@@ -1104,7 +1165,7 @@ def history():
         transactions = [
             {
                 "type": row[0],
-                "points_change": row[1],
+                "points_change": int(row[1] or 0),
                 "usd_change": float(row[2] or 0),
                 "description": row[3] or "",
                 "created_at": row[4]
@@ -1114,32 +1175,59 @@ def history():
 
         cursor.execute(
             f"""
-            SELECT points, status, created_at, processed_at
+            SELECT id, points, status, created_at, processed_at,
+                   amount_usd, wallet_address, token, network
             FROM withdrawals
             WHERE user_id = {p}
-            ORDER BY id DESC
-            LIMIT 100
+            ORDER BY id DESC LIMIT 100
             """,
             (session["user_id"],)
         )
 
+        withdrawals = []
+
         for row in cursor.fetchall():
-            transactions.append({
-                "type": "withdrawal",
-                "points_change": -int(row[0]),
-                "usd_change": 0,
-                "description": f"Withdrawal request — {row[1]}",
-                "created_at": row[2]
+            amount = Decimal(str(row[5] or 0))
+            is_usd_withdrawal = amount > 0
+
+            withdrawals.append({
+                "id": row[0],
+                "type": (
+                    "USDT withdrawal"
+                    if is_usd_withdrawal
+                    else "Legacy withdrawal"
+                ),
+                "points_change": (
+                    0 if is_usd_withdrawal else -int(row[1] or 0)
+                ),
+                "usd_change": (
+                    float(-amount) if is_usd_withdrawal else 0
+                ),
+                "description": (
+                    f"{row[8] or 'Polygon'} {row[7] or 'USDT'} "
+                    f"withdrawal to {row[6] or 'wallet not recorded'} "
+                    f"— {row[2]}"
+                    if is_usd_withdrawal
+                    else f"Older points withdrawal — {row[2]}"
+                ),
+                "created_at": row[3],
+                "processed_at": row[4],
+                "wallet_address": row[6],
+                "token": row[7],
+                "network": row[8],
+                "status": row[2]
             })
 
+        transactions.extend(withdrawals)
         transactions.sort(
-            key=lambda item: str(item["created_at"] or ""),
+            key=lambda item: str(item.get("created_at") or ""),
             reverse=True
         )
 
         return render_template(
             "history.html",
-            transactions=transactions
+            transactions=transactions,
+            withdrawals=withdrawals
         )
 
     except Exception:
@@ -1152,10 +1240,51 @@ def history():
         conn.close()
 
 
-@app.route("/withdraw", methods=["POST"])
+@app.route("/withdraw", methods=["GET", "POST"])
 def withdraw():
     if "user_id" not in session:
         return redirect(url_for("login"))
+
+    if request.method == "GET":
+        return redirect(url_for("dashboard"))
+
+    raw_amount = (request.form.get("amount") or "").strip()
+    wallet_address = (
+        request.form.get("wallet_address") or ""
+    ).strip()
+
+    try:
+        amount = Decimal(raw_amount)
+
+        if not amount.is_finite():
+            raise ValueError("Invalid amount")
+
+        amount = amount.quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+
+    except Exception:
+        flash("Enter a valid USD withdrawal amount.", "error")
+        return redirect(url_for("dashboard"))
+
+    if amount < MIN_WITHDRAWAL_USD:
+        flash("Minimum withdrawal is $50 USDT.", "error")
+        return redirect(url_for("dashboard"))
+
+    if (
+        len(wallet_address) != 42
+        or not wallet_address.startswith("0x")
+        or any(
+            ch not in "0123456789abcdefABCDEF"
+            for ch in wallet_address[2:]
+        )
+    ):
+        flash(
+            "Enter a valid Polygon-compatible wallet address "
+            "beginning with 0x.",
+            "error"
+        )
+        return redirect(url_for("dashboard"))
 
     conn = get_db()
     cursor = conn.cursor()
@@ -1164,34 +1293,56 @@ def withdraw():
     try:
         if DATABASE_URL:
             cursor.execute(
-                "SELECT points FROM users WHERE id = %s FOR UPDATE",
+                """
+                SELECT usd_balance FROM users
+                WHERE id = %s FOR UPDATE
+                """,
                 (session["user_id"],)
             )
         else:
             cursor.execute("BEGIN IMMEDIATE")
             cursor.execute(
-                "SELECT points FROM users WHERE id = ?",
+                "SELECT usd_balance FROM users WHERE id = ?",
                 (session["user_id"],)
             )
 
-        row = cursor.fetchone()
+        user = cursor.fetchone()
 
-        if not row:
+        if not user:
             conn.rollback()
             session.clear()
             return redirect(url_for("login"))
 
-        points = int(row[0] or 0)
+        balance = Decimal(str(user[0] or 0))
 
-        if points < MIN_WITHDRAWAL_POINTS:
+        if balance < amount:
             conn.rollback()
-            flash("Minimum withdrawal is 6,000 points ($30).", "error")
+            flash(
+                "Your USD balance is not enough for this withdrawal.",
+                "error"
+            )
+            return redirect(url_for("dashboard"))
+
+        active_referrals = count_active_referrals(
+            cursor, session["user_id"]
+        )
+
+        if active_referrals < MIN_ACTIVE_REFERRALS:
+            conn.rollback()
+            flash(
+                f"You need at least {MIN_ACTIVE_REFERRALS} active "
+                f"referrals. You currently have {active_referrals}. "
+                "Each referral must claim at least one ad reward.",
+                "error"
+            )
             return redirect(url_for("dashboard"))
 
         cursor.execute(
             f"""
             SELECT id FROM withdrawals
-            WHERE user_id = {p} AND status = 'pending'
+            WHERE user_id = {p}
+              AND status = 'pending'
+              AND amount_usd > 0
             """,
             (session["user_id"],)
         )
@@ -1199,37 +1350,62 @@ def withdraw():
         if cursor.fetchone():
             conn.rollback()
             flash(
-                "You already have a pending withdrawal request.",
+                "You already have a pending USD withdrawal request.",
                 "error"
             )
             return redirect(url_for("dashboard"))
 
-        cursor.execute(
-            f"UPDATE users SET points = points - {p} WHERE id = {p}",
-            (points, session["user_id"])
+        created_at = (
+            datetime.now() if DATABASE_URL
+            else datetime.now().isoformat(sep=" ")
         )
 
         cursor.execute(
             f"""
-            INSERT INTO withdrawals (user_id, points, status)
-            VALUES ({p}, {p}, 'pending')
+            INSERT INTO withdrawals
+            (user_id, points, status, created_at, amount_usd,
+             wallet_address, token, network)
+            VALUES ({p}, 0, 'pending', {p}, {p}, {p}, {p}, {p})
             """,
-            (session["user_id"], points)
+            (
+                session["user_id"], created_at, float(amount),
+                wallet_address, WITHDRAWAL_TOKEN, WITHDRAWAL_NETWORK
+            )
+        )
+
+        cursor.execute(
+            f"""
+            UPDATE users
+            SET usd_balance = usd_balance - {p}
+            WHERE id = {p}
+            """,
+            (float(amount), session["user_id"])
         )
 
         record_transaction(
-            cursor, session["user_id"], "withdrawal",
-            points_change=-points,
-            description="Withdrawal request submitted"
+            cursor, session["user_id"], "usd_withdrawal",
+            usd_change=-amount,
+            description=(
+                f"Pending {WITHDRAWAL_TOKEN} withdrawal on "
+                f"{WITHDRAWAL_NETWORK} to {wallet_address}"
+            )
         )
 
         conn.commit()
-        flash("Withdrawal request submitted for review.", "success")
+
+        flash(
+            f"${amount:.2f} USDT withdrawal request submitted. "
+            "Your request is pending manual admin payment.",
+            "success"
+        )
 
     except Exception:
         conn.rollback()
-        app.logger.exception("Withdrawal request failed.")
-        flash("Could not submit your withdrawal request.", "error")
+        app.logger.exception("USD withdrawal request failed.")
+        flash(
+            "Could not submit your withdrawal request. Please try again.",
+            "error"
+        )
 
     finally:
         cursor.close()
@@ -1269,7 +1445,9 @@ def admin_dashboard():
         cursor.execute("""
             SELECT withdrawals.id, users.username, users.email,
                    withdrawals.points, withdrawals.status,
-                   withdrawals.created_at
+                   withdrawals.created_at, withdrawals.amount_usd,
+                   withdrawals.wallet_address, withdrawals.token,
+                   withdrawals.network
             FROM withdrawals
             JOIN users ON users.id = withdrawals.user_id
             ORDER BY withdrawals.id DESC
@@ -1317,7 +1495,8 @@ def process_withdrawal(withdrawal_id, action):
         if DATABASE_URL:
             cursor.execute(
                 """
-                SELECT user_id, points, status
+                SELECT user_id, points, status, amount_usd,
+                       wallet_address, token, network
                 FROM withdrawals WHERE id = %s FOR UPDATE
                 """,
                 (withdrawal_id,)
@@ -1326,7 +1505,8 @@ def process_withdrawal(withdrawal_id, action):
             cursor.execute("BEGIN IMMEDIATE")
             cursor.execute(
                 """
-                SELECT user_id, points, status
+                SELECT user_id, points, status, amount_usd,
+                       wallet_address, token, network
                 FROM withdrawals WHERE id = ?
                 """,
                 (withdrawal_id,)
@@ -1339,17 +1519,25 @@ def process_withdrawal(withdrawal_id, action):
             flash("Withdrawal request not found.", "error")
             return redirect(url_for("admin_dashboard"))
 
-        user_id, points, status = withdrawal
+        user_id = withdrawal[0]
+        points = int(withdrawal[1] or 0)
+        status = withdrawal[2]
+        amount_usd = Decimal(str(withdrawal[3] or 0))
+        wallet_address = withdrawal[4] or ""
+        token = withdrawal[5] or "USDT"
+        network = withdrawal[6] or "Polygon"
 
         if status != "pending":
             conn.rollback()
-            flash("This withdrawal has already been processed.", "error")
+            flash(
+                "This withdrawal has already been processed.",
+                "error"
+            )
             return redirect(url_for("admin_dashboard"))
 
         new_status = "approved" if action == "approve" else "rejected"
         processed_at = (
-            datetime.now()
-            if DATABASE_URL
+            datetime.now() if DATABASE_URL
             else datetime.now().isoformat(sep=" ")
         )
 
@@ -1363,23 +1551,59 @@ def process_withdrawal(withdrawal_id, action):
         )
 
         if action == "reject":
-            cursor.execute(
-                f"UPDATE users SET points = points + {p} WHERE id = {p}",
-                (points, user_id)
-            )
-            record_transaction(
-                cursor, user_id, "withdrawal_refund",
-                points_change=points,
-                description=f"Refund for rejected withdrawal #{withdrawal_id}"
-            )
+            if amount_usd > 0:
+                cursor.execute(
+                    f"""
+                    UPDATE users
+                    SET usd_balance = usd_balance + {p}
+                    WHERE id = {p}
+                    """,
+                    (float(amount_usd), user_id)
+                )
+
+                record_transaction(
+                    cursor, user_id, "usd_withdrawal_refund",
+                    usd_change=amount_usd,
+                    description=(
+                        f"Refund for rejected {token} withdrawal "
+                        f"#{withdrawal_id}"
+                    )
+                )
+
+            elif points > 0:
+                cursor.execute(
+                    f"""
+                    UPDATE users
+                    SET points = points + {p}
+                    WHERE id = {p}
+                    """,
+                    (points, user_id)
+                )
+
+                record_transaction(
+                    cursor, user_id, "withdrawal_refund",
+                    points_change=points,
+                    description=(
+                        f"Refund for rejected withdrawal #{withdrawal_id}"
+                    )
+                )
 
         conn.commit()
 
         if action == "approve":
-            flash("Withdrawal approved successfully.", "success")
+            if amount_usd > 0:
+                flash(
+                    f"Withdrawal #{withdrawal_id} marked approved. "
+                    f"Confirm you sent ${amount_usd:.2f} {token} to "
+                    f"{wallet_address} on {network}.",
+                    "success"
+                )
+            else:
+                flash("Older withdrawal approved.", "success")
         else:
             flash(
-                "Withdrawal rejected. Points returned to the user.",
+                "Withdrawal rejected. The USD or points have been "
+                "returned to the user's balance.",
                 "success"
             )
 
