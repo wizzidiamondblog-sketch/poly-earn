@@ -27,7 +27,10 @@ AD_WINDOW = timedelta(hours=2)
 POINTS_PER_AD = 3
 REFERRAL_POINTS = 50
 MIN_REDEEM_POINTS = 100
-MIN_WITHDRAWAL_POINTS = 6000
+MIN_WITHDRAWAL_USD = Decimal("50.00")
+MIN_ACTIVE_REFERRALS = 3
+WITHDRAWAL_TOKEN = "USDT"
+WITHDRAWAL_NETWORK = "Polygon"
 
 logging.basicConfig(level=logging.INFO)
 
@@ -35,9 +38,7 @@ logging.basicConfig(level=logging.INFO)
 def get_db():
     if DATABASE_URL:
         return psycopg2.connect(
-            DATABASE_URL,
-            sslmode="require",
-            connect_timeout=10
+            DATABASE_URL, sslmode="require", connect_timeout=10
         )
 
     conn = sqlite3.connect("poly_earn.db", timeout=15)
@@ -62,10 +63,7 @@ def record_transaction(cursor, user_id, kind, points_change=0,
         (user_id, type, points_change, usd_change, description)
         VALUES ({p}, {p}, {p}, {p}, {p})
         """,
-        (
-            user_id, kind, points_change,
-            float(usd_change), description
-        )
+        (user_id, kind, points_change, float(usd_change), description)
     )
 
 
@@ -105,22 +103,38 @@ def init_db():
                 ("referred_by", "INTEGER REFERENCES users(id)"),
                 ("created_at", "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP")
             ]
-
             for name, definition in migrations:
                 cursor.execute(
-                    f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {name} {definition}"
+                    f"ALTER TABLE users ADD COLUMN IF NOT EXISTS "
+                    f"{name} {definition}"
                 )
 
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS withdrawals (
                     id SERIAL PRIMARY KEY,
                     user_id INTEGER NOT NULL REFERENCES users(id),
-                    points INTEGER NOT NULL,
+                    points INTEGER NOT NULL DEFAULT 0,
                     status VARCHAR(20) NOT NULL DEFAULT 'pending',
                     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    processed_at TIMESTAMP
+                    processed_at TIMESTAMP,
+                    amount_usd NUMERIC(12,2) NOT NULL DEFAULT 0,
+                    wallet_address TEXT,
+                    token VARCHAR(20) NOT NULL DEFAULT 'USDT',
+                    network VARCHAR(30) NOT NULL DEFAULT 'Polygon'
                 )
             """)
+
+            withdrawal_migrations = [
+                ("amount_usd", "NUMERIC(12,2) NOT NULL DEFAULT 0"),
+                ("wallet_address", "TEXT"),
+                ("token", "VARCHAR(20) NOT NULL DEFAULT 'USDT'"),
+                ("network", "VARCHAR(30) NOT NULL DEFAULT 'Polygon'")
+            ]
+            for name, definition in withdrawal_migrations:
+                cursor.execute(
+                    f"ALTER TABLE withdrawals ADD COLUMN IF NOT EXISTS "
+                    f"{name} {definition}"
+                )
 
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS admin_login_history (
@@ -167,7 +181,6 @@ def init_db():
 
             cursor.execute("PRAGMA table_info(users)")
             columns = {row[1] for row in cursor.fetchall()}
-
             migrations = [
                 ("points", "INTEGER NOT NULL DEFAULT 0"),
                 ("ads_watched_count", "INTEGER NOT NULL DEFAULT 0"),
@@ -179,7 +192,6 @@ def init_db():
                 ("referred_by", "INTEGER"),
                 ("created_at", "TEXT")
             ]
-
             for name, definition in migrations:
                 if name not in columns:
                     cursor.execute(
@@ -190,13 +202,34 @@ def init_db():
                 CREATE TABLE IF NOT EXISTS withdrawals (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     user_id INTEGER NOT NULL,
-                    points INTEGER NOT NULL,
+                    points INTEGER NOT NULL DEFAULT 0,
                     status TEXT NOT NULL DEFAULT 'pending',
                     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     processed_at TEXT,
+                    amount_usd NUMERIC NOT NULL DEFAULT 0,
+                    wallet_address TEXT,
+                    token TEXT NOT NULL DEFAULT 'USDT',
+                    network TEXT NOT NULL DEFAULT 'Polygon',
                     FOREIGN KEY (user_id) REFERENCES users(id)
                 )
             """)
+
+            cursor.execute("PRAGMA table_info(withdrawals)")
+            withdrawal_columns = {
+                row[1] for row in cursor.fetchall()
+            }
+            withdrawal_migrations = [
+                ("amount_usd", "NUMERIC NOT NULL DEFAULT 0"),
+                ("wallet_address", "TEXT"),
+                ("token", "TEXT NOT NULL DEFAULT 'USDT'"),
+                ("network", "TEXT NOT NULL DEFAULT 'Polygon'")
+            ]
+            for name, definition in withdrawal_migrations:
+                if name not in withdrawal_columns:
+                    cursor.execute(
+                        f"ALTER TABLE withdrawals ADD COLUMN "
+                        f"{name} {definition}"
+                    )
 
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS admin_login_history (
@@ -223,14 +256,11 @@ def init_db():
             """)
 
         cursor.execute("SELECT id, referral_code FROM users")
-        existing_users = cursor.fetchall()
-
-        for user in existing_users:
+        for user in cursor.fetchall():
             if not user[1]:
-                code = new_referral_code()
                 cursor.execute(
                     f"UPDATE users SET referral_code = {p} WHERE id = {p}",
-                    (code, user[0])
+                    (new_referral_code(), user[0])
                 )
 
         cursor.execute("""
@@ -241,10 +271,8 @@ def init_db():
         if ADMIN_EMAIL:
             admin_value = "TRUE" if DATABASE_URL else "1"
             cursor.execute(
-                f"""
-                UPDATE users SET is_admin = {admin_value}
-                WHERE LOWER(email) = {p}
-                """,
+                f"UPDATE users SET is_admin = {admin_value} "
+                f"WHERE LOWER(email) = {p}",
                 (ADMIN_EMAIL,)
             )
 
@@ -287,11 +315,9 @@ def is_admin_user():
         )
         row = cursor.fetchone()
         return bool(row and row[0].strip().lower() == ADMIN_EMAIL)
-
     except Exception:
         app.logger.exception("Admin authorization check failed.")
         return False
-
     finally:
         cursor.close()
         conn.close()
@@ -311,7 +337,6 @@ def get_user_ad_status(user_id):
             (user_id,)
         )
         row = cursor.fetchone()
-
         if not row:
             return None
 
@@ -333,26 +358,43 @@ def get_user_ad_status(user_id):
             window_start = None
 
         return count, window_start
-
     finally:
         cursor.close()
         conn.close()
 
 
+def count_active_referrals(cursor, user_id):
+    p = placeholder()
+    cursor.execute(
+        f"""
+        SELECT COUNT(DISTINCT u.id)
+        FROM users u
+        WHERE u.referred_by = {p}
+          AND EXISTS (
+              SELECT 1
+              FROM transactions t
+              WHERE t.user_id = u.id
+                AND t.type = 'ad_reward'
+                AND t.points_change > 0
+          )
+        """,
+        (user_id,)
+    )
+    row = cursor.fetchone()
+    return int(row[0] or 0)
+
+
 def record_admin_login_attempt(email, success):
     normalized_email = (email or "").strip().lower()
-
     if not ADMIN_EMAIL or normalized_email != ADMIN_EMAIL:
         return
 
     conn = None
     cursor = None
-
     try:
         conn = get_db()
         cursor = conn.cursor()
         p = placeholder()
-
         cursor.execute(
             f"""
             INSERT INTO admin_login_history
@@ -367,12 +409,10 @@ def record_admin_login_attempt(email, success):
             )
         )
         conn.commit()
-
     except Exception:
         if conn:
             conn.rollback()
         app.logger.exception("Could not record admin login attempt.")
-
     finally:
         if cursor:
             cursor.close()
@@ -385,7 +425,9 @@ def home():
     if "user_id" in session:
         return redirect(url_for("dashboard"))
     return redirect(url_for("login"))
-    @app.route("/register", methods=["GET", "POST"])
+
+
+@app.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "GET":
         code = (request.args.get("ref") or "").strip().upper()
@@ -400,11 +442,9 @@ def register():
     if not username or not email or not password:
         flash("All fields are required.", "error")
         return redirect(url_for("register"))
-
     if len(username) > 80 or len(email) > 120:
         flash("Username or email is too long.", "error")
         return redirect(url_for("register"))
-
     if len(password) < 8:
         flash("Password must be at least 8 characters.", "error")
         return redirect(url_for("register"))
@@ -436,8 +476,7 @@ def register():
                 RETURNING id
                 """,
                 (
-                    username, email,
-                    generate_password_hash(password),
+                    username, email, generate_password_hash(password),
                     referral_code, referred_by
                 )
             )
@@ -450,8 +489,7 @@ def register():
                 VALUES (?, ?, ?, ?, ?)
                 """,
                 (
-                    username, email,
-                    generate_password_hash(password),
+                    username, email, generate_password_hash(password),
                     referral_code, referred_by
                 )
             )
@@ -476,12 +514,8 @@ def register():
     except Exception:
         conn.rollback()
         app.logger.exception("Registration failed.")
-        flash(
-            "Registration failed. Username or email may already exist.",
-            "error"
-        )
+        flash("Registration failed. Username or email may already exist.", "error")
         return redirect(url_for("register"))
-
     finally:
         cursor.close()
         conn.close()
@@ -492,7 +526,6 @@ def login():
     if request.method == "POST":
         email = (request.form.get("email") or "").strip().lower()
         password = request.form.get("password") or ""
-
         conn = get_db()
         cursor = conn.cursor()
         p = placeholder()
@@ -516,11 +549,9 @@ def login():
                 return redirect(url_for("dashboard"))
 
             flash("Invalid email or password.", "error")
-
         except Exception:
             app.logger.exception("Login failed.")
             flash("Login error. Please try again.", "error")
-
         finally:
             cursor.close()
             conn.close()
@@ -540,17 +571,13 @@ def admin_login():
     if request.method == "POST":
         email = (request.form.get("email") or "").strip().lower()
         password = request.form.get("password") or ""
-
         conn = get_db()
         cursor = conn.cursor()
         p = placeholder()
 
         try:
             cursor.execute(
-                f"""
-                SELECT id, username, password
-                FROM users WHERE LOWER(email) = {p}
-                """,
+                f"SELECT id, username, password FROM users WHERE LOWER(email) = {p}",
                 (ADMIN_EMAIL,)
             )
             user = cursor.fetchone()
@@ -567,19 +594,14 @@ def admin_login():
                 return redirect(url_for("admin_dashboard"))
 
             flash("Invalid admin email or password.", "error")
-
         except Exception:
             app.logger.exception("Admin login failed.")
             flash("Login failed. Please try again.", "error")
-
         finally:
             cursor.close()
             conn.close()
 
-    return render_template("admin_login.html")
-
-
-@app.route("/dashboard")
+    return render_template("admin_login.html")@app.route("/dashboard")
 def dashboard():
     if "user_id" not in session:
         return redirect(url_for("login"))
@@ -603,8 +625,8 @@ def dashboard():
             session.clear()
             return redirect(url_for("login"))
 
-        points = row[0] or 0
-        count = row[1] or 0
+        points = int(row[0] or 0)
+        count = int(row[1] or 0)
         window_start = parse_datetime(row[2])
         usd_balance = float(row[3] or 0)
 
@@ -635,16 +657,16 @@ def dashboard():
             usd_balance=usd_balance,
             ads_watched=count
         )
-
     except Exception:
         app.logger.exception("Dashboard failed.")
         flash("Could not load your balance.", "error")
         return redirect(url_for("login"))
-
     finally:
         cursor.close()
         conn.close()
-        @app.route("/watch-ad")
+
+
+@app.route("/watch-ad")
 def watch_ad():
     if "user_id" not in session:
         return redirect(url_for("login"))
@@ -673,13 +695,12 @@ def watch_ad():
             )
 
         row = cursor.fetchone()
-
         if not row:
             conn.rollback()
             session.clear()
             return redirect(url_for("login"))
 
-        count = row[0] or 0
+        count = int(row[0] or 0)
         window_start = parse_datetime(row[1])
         now = datetime.now()
 
@@ -713,7 +734,6 @@ def watch_ad():
         app.logger.exception("Watch-ad page failed.")
         flash("Could not open the ad page.", "error")
         return redirect(url_for("dashboard"))
-
     finally:
         cursor.close()
         conn.close()
@@ -725,7 +745,6 @@ def claim_reward():
         return redirect(url_for("login"))
 
     opened_at = session.get("ad_page_opened_at")
-
     if opened_at is None or time.time() - opened_at < 10:
         flash("Please wait at least 10 seconds before claiming.", "error")
         return redirect(url_for("watch_ad"))
@@ -754,13 +773,12 @@ def claim_reward():
             )
 
         row = cursor.fetchone()
-
         if not row:
             conn.rollback()
             session.clear()
             return redirect(url_for("login"))
 
-        count = row[1] or 0
+        count = int(row[1] or 0)
         window_start = parse_datetime(row[2])
         now = datetime.now()
 
@@ -781,10 +799,7 @@ def claim_reward():
             window_start if DATABASE_URL
             else window_start.isoformat(sep=" ")
         )
-        ad_timestamp = (
-            now if DATABASE_URL
-            else now.isoformat(sep=" ")
-        )
+        ad_timestamp = now if DATABASE_URL else now.isoformat(sep=" ")
 
         cursor.execute(
             f"""
@@ -796,11 +811,8 @@ def claim_reward():
             WHERE id = {p}
             """,
             (
-                POINTS_PER_AD,
-                count + 1,
-                window_timestamp,
-                ad_timestamp,
-                session["user_id"]
+                POINTS_PER_AD, count + 1, window_timestamp,
+                ad_timestamp, session["user_id"]
             )
         )
 
@@ -818,7 +830,6 @@ def claim_reward():
         conn.rollback()
         app.logger.exception("Reward claim failed.")
         flash("Reward claim failed. Please try again.", "error")
-
     finally:
         cursor.close()
         conn.close()
@@ -832,7 +843,6 @@ def tasks():
         return redirect(url_for("login"))
 
     status = get_user_ad_status(session["user_id"])
-
     if status is None:
         session.clear()
         return redirect(url_for("login"))
@@ -843,8 +853,7 @@ def tasks():
     if window_start:
         elapsed = (datetime.now() - window_start).total_seconds()
         remaining_seconds = max(
-            0,
-            int(AD_WINDOW.total_seconds() - elapsed)
+            0, int(AD_WINDOW.total_seconds() - elapsed)
         )
 
     return render_template(
@@ -866,10 +875,7 @@ def invite():
 
     try:
         cursor.execute(
-            f"""
-            SELECT referral_code, points
-            FROM users WHERE id = {p}
-            """,
+            f"SELECT referral_code, points FROM users WHERE id = {p}",
             (session["user_id"],)
         )
         user = cursor.fetchone()
@@ -892,20 +898,23 @@ def invite():
         )
         referrals = cursor.fetchall()
 
+        active_referrals = count_active_referrals(
+            cursor, session["user_id"]
+        )
+
         return render_template(
             "invite.html",
             referral_code=user[0],
             referral_link=referral_link,
             referrals=referrals,
             referral_count=len(referrals),
+            active_referrals=active_referrals,
             referral_points=REFERRAL_POINTS
         )
-
     except Exception:
         app.logger.exception("Invite page failed.")
         flash("Could not load your referral details.", "error")
         return redirect(url_for("dashboard"))
-
     finally:
         cursor.close()
         conn.close()
@@ -960,14 +969,12 @@ def redeem():
                 )
 
             user = cursor.fetchone()
-
             if not user:
                 conn.rollback()
                 session.clear()
                 return redirect(url_for("login"))
 
             current_points = int(user[0] or 0)
-
             if current_points < points_to_redeem:
                 conn.rollback()
                 flash("You do not have enough points.", "error")
@@ -999,17 +1006,14 @@ def redeem():
 
             conn.commit()
             flash(
-                f"Redeemed {points_to_redeem} points into ${usd_amount:.2f} "
-                "in your Poly Earn USD wallet.",
+                f"Redeemed {points_to_redeem} points into "
+                f"${usd_amount:.2f} in your USD wallet.",
                 "success"
             )
             return redirect(url_for("redeem"))
 
         cursor.execute(
-            f"""
-            SELECT points, usd_balance
-            FROM users WHERE id = {p}
-            """,
+            f"SELECT points, usd_balance FROM users WHERE id = {p}",
             (session["user_id"],)
         )
         user = cursor.fetchone()
@@ -1030,11 +1034,9 @@ def redeem():
         app.logger.exception("Redemption failed.")
         flash("Could not process redemption. Please try again.", "error")
         return redirect(url_for("dashboard"))
-
     finally:
         cursor.close()
-        conn.close()
-        @app.route("/profile")
+        conn.close()@app.route("/profile")
 def profile():
     if "user_id" not in session:
         return redirect(url_for("login"))
@@ -1059,12 +1061,10 @@ def profile():
             return redirect(url_for("login"))
 
         return render_template("profile.html", user=user)
-
     except Exception:
         app.logger.exception("Profile page failed.")
         flash("Could not load your profile.", "error")
         return redirect(url_for("dashboard"))
-
     finally:
         cursor.close()
         conn.close()
@@ -1086,8 +1086,7 @@ def history():
                    description, created_at
             FROM transactions
             WHERE user_id = {p}
-            ORDER BY id DESC
-            LIMIT 200
+            ORDER BY id DESC LIMIT 200
             """,
             (session["user_id"],)
         )
@@ -1105,48 +1104,95 @@ def history():
 
         cursor.execute(
             f"""
-            SELECT points, status, created_at, processed_at
+            SELECT id, points, status, created_at, processed_at,
+                   amount_usd, wallet_address, token, network
             FROM withdrawals
             WHERE user_id = {p}
-            ORDER BY id DESC
-            LIMIT 100
+            ORDER BY id DESC LIMIT 100
             """,
             (session["user_id"],)
         )
 
+        withdrawals = []
         for row in cursor.fetchall():
-            transactions.append({
-                "type": "withdrawal",
-                "points_change": -int(row[0]),
-                "usd_change": 0,
-                "description": f"Withdrawal request — {row[1]}",
-                "created_at": row[2]
+            amount = Decimal(str(row[5] or 0))
+            is_usd_withdrawal = amount > 0
+
+            withdrawals.append({
+                "id": row[0],
+                "type": "USDT withdrawal" if is_usd_withdrawal else "Legacy withdrawal",
+                "points_change": 0 if is_usd_withdrawal else -int(row[1] or 0),
+                "usd_change": float(-amount) if is_usd_withdrawal else 0,
+                "description": (
+                    f"{row[8] or 'Polygon'} {row[7] or 'USDT'} withdrawal "
+                    f"to {row[6] or 'wallet not recorded'} — {row[2]}"
+                    if is_usd_withdrawal
+                    else f"Older points withdrawal — {row[2]}"
+                ),
+                "created_at": row[3],
+                "processed_at": row[4],
+                "wallet_address": row[6],
+                "token": row[7],
+                "network": row[8],
+                "status": row[2]
             })
 
+        transactions.extend(withdrawals)
         transactions.sort(
-            key=lambda item: str(item["created_at"] or ""),
+            key=lambda item: str(item.get("created_at") or ""),
             reverse=True
         )
 
         return render_template(
             "history.html",
-            transactions=transactions
+            transactions=transactions,
+            withdrawals=withdrawals
         )
-
     except Exception:
         app.logger.exception("Transaction history failed.")
         flash("Could not load your transaction history.", "error")
         return redirect(url_for("dashboard"))
-
     finally:
         cursor.close()
         conn.close()
 
 
-@app.route("/withdraw", methods=["POST"])
+@app.route("/withdraw", methods=["GET", "POST"])
 def withdraw():
     if "user_id" not in session:
         return redirect(url_for("login"))
+
+    if request.method == "GET":
+        # The dashboard will contain the withdrawal form.
+        return redirect(url_for("dashboard"))
+
+    raw_amount = (request.form.get("amount") or "").strip()
+    wallet_address = (
+        request.form.get("wallet_address") or ""
+    ).strip()
+
+    try:
+        amount = Decimal(raw_amount).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+    except Exception:
+        flash("Enter a valid USD withdrawal amount.", "error")
+        return redirect(url_for("dashboard"))
+
+    if not amount.is_finite() or amount < MIN_WITHDRAWAL_USD:
+        flash("Minimum withdrawal is $50 USDT.", "error")
+        return redirect(url_for("dashboard"))
+
+    if len(wallet_address) != 42 or not wallet_address.startswith("0x"):
+        flash(
+            "Enter a valid Polygon-compatible wallet address beginning with 0x.",
+            "error"
+        )
+        return redirect(url_for("dashboard"))
+
+    if any(ch not in "0123456789abcdefABCDEF" for ch in wallet_address[2:]):
+        flash("Your wallet address contains invalid characters.", "error")
+        return redirect(url_for("dashboard"))
 
     conn = get_db()
     cursor = conn.cursor()
@@ -1155,81 +1201,112 @@ def withdraw():
     try:
         if DATABASE_URL:
             cursor.execute(
-                "SELECT points FROM users WHERE id = %s FOR UPDATE",
+                """
+                SELECT usd_balance FROM users
+                WHERE id = %s FOR UPDATE
+                """,
                 (session["user_id"],)
             )
         else:
             cursor.execute("BEGIN IMMEDIATE")
             cursor.execute(
-                "SELECT points FROM users WHERE id = ?",
+                "SELECT usd_balance FROM users WHERE id = ?",
                 (session["user_id"],)
             )
 
-        row = cursor.fetchone()
-
-        if not row:
+        user = cursor.fetchone()
+        if not user:
             conn.rollback()
             session.clear()
             return redirect(url_for("login"))
 
-        points = int(row[0] or 0)
-
-        if points < MIN_WITHDRAWAL_POINTS:
+        balance = Decimal(str(user[0] or 0))
+        if balance < amount:
             conn.rollback()
-            flash("Minimum withdrawal is 6,000 points ($30).", "error")
+            flash("Your USD balance is not enough for this withdrawal.", "error")
+            return redirect(url_for("dashboard"))
+
+        active_referrals = count_active_referrals(
+            cursor, session["user_id"]
+        )
+        if active_referrals < MIN_ACTIVE_REFERRALS:
+            conn.rollback()
+            flash(
+                f"You need at least {MIN_ACTIVE_REFERRALS} active referrals. "
+                f"You currently have {active_referrals}. Each referral must "
+                "claim at least one ad reward.",
+                "error"
+            )
             return redirect(url_for("dashboard"))
 
         cursor.execute(
             f"""
             SELECT id FROM withdrawals
             WHERE user_id = {p} AND status = 'pending'
+              AND amount_usd > 0
             """,
             (session["user_id"],)
         )
-
         if cursor.fetchone():
             conn.rollback()
             flash(
-                "You already have a pending withdrawal request.",
+                "You already have a pending USD withdrawal request.",
                 "error"
             )
             return redirect(url_for("dashboard"))
 
-        cursor.execute(
-            f"UPDATE users SET points = points - {p} WHERE id = {p}",
-            (points, session["user_id"])
+        created_at = (
+            datetime.now() if DATABASE_URL
+            else datetime.now().isoformat(sep=" ")
         )
 
         cursor.execute(
             f"""
-            INSERT INTO withdrawals (user_id, points, status)
-            VALUES ({p}, {p}, 'pending')
+            INSERT INTO withdrawals
+            (user_id, points, status, created_at, amount_usd,
+             wallet_address, token, network)
+            VALUES ({p}, 0, 'pending', {p}, {p}, {p}, {p}, {p})
             """,
-            (session["user_id"], points)
+            (
+                session["user_id"], created_at, float(amount),
+                wallet_address, WITHDRAWAL_TOKEN, WITHDRAWAL_NETWORK
+            )
+        )
+
+        cursor.execute(
+            f"""
+            UPDATE users
+            SET usd_balance = usd_balance - {p}
+            WHERE id = {p}
+            """,
+            (float(amount), session["user_id"])
         )
 
         record_transaction(
-            cursor, session["user_id"], "withdrawal",
-            points_change=-points,
-            description="Withdrawal request submitted"
+            cursor, session["user_id"], "usd_withdrawal",
+            usd_change=-amount,
+            description=(
+                f"Pending {WITHDRAWAL_TOKEN} withdrawal on "
+                f"{WITHDRAWAL_NETWORK} to {wallet_address}"
+            )
         )
 
         conn.commit()
-        flash("Withdrawal request submitted for review.", "success")
+        flash(
+            f"${amount:.2f} USDT withdrawal request submitted. "
+            "Your request is pending manual admin payment.",
+            "success"
+        )
 
     except Exception:
         conn.rollback()
-        app.logger.exception("Withdrawal request failed.")
-        flash("Could not submit your withdrawal request.", "error")
-
+        app.logger.exception("USD withdrawal request failed.")
+        flash("Could not submit your withdrawal request. Please try again.", "error")
     finally:
         cursor.close()
         conn.close()
 
-    return redirect(url_for("dashboard"))
-
-
-@app.route("/admin")
+    return redirect(url_for("dashboard"))@app.route("/admin")
 def admin_dashboard():
     if not is_admin_user():
         session.clear()
@@ -1260,7 +1337,9 @@ def admin_dashboard():
         cursor.execute("""
             SELECT withdrawals.id, users.username, users.email,
                    withdrawals.points, withdrawals.status,
-                   withdrawals.created_at
+                   withdrawals.created_at, withdrawals.amount_usd,
+                   withdrawals.wallet_address, withdrawals.token,
+                   withdrawals.network
             FROM withdrawals
             JOIN users ON users.id = withdrawals.user_id
             ORDER BY withdrawals.id DESC
@@ -1275,12 +1354,10 @@ def admin_dashboard():
             users=users,
             withdrawals=withdrawals
         )
-
     except Exception:
         app.logger.exception("Admin dashboard failed.")
         flash("Could not load the admin dashboard.", "error")
         return redirect(url_for("admin_login"))
-
     finally:
         cursor.close()
         conn.close()
@@ -1308,7 +1385,8 @@ def process_withdrawal(withdrawal_id, action):
         if DATABASE_URL:
             cursor.execute(
                 """
-                SELECT user_id, points, status
+                SELECT user_id, points, status, amount_usd,
+                       wallet_address, token, network
                 FROM withdrawals WHERE id = %s FOR UPDATE
                 """,
                 (withdrawal_id,)
@@ -1317,20 +1395,26 @@ def process_withdrawal(withdrawal_id, action):
             cursor.execute("BEGIN IMMEDIATE")
             cursor.execute(
                 """
-                SELECT user_id, points, status
+                SELECT user_id, points, status, amount_usd,
+                       wallet_address, token, network
                 FROM withdrawals WHERE id = ?
                 """,
                 (withdrawal_id,)
             )
 
         withdrawal = cursor.fetchone()
-
         if not withdrawal:
             conn.rollback()
             flash("Withdrawal request not found.", "error")
             return redirect(url_for("admin_dashboard"))
 
-        user_id, points, status = withdrawal
+        user_id = withdrawal[0]
+        points = int(withdrawal[1] or 0)
+        status = withdrawal[2]
+        amount_usd = Decimal(str(withdrawal[3] or 0))
+        wallet_address = withdrawal[4] or ""
+        token = withdrawal[5] or "USDT"
+        network = withdrawal[6] or "Polygon"
 
         if status != "pending":
             conn.rollback()
@@ -1339,8 +1423,7 @@ def process_withdrawal(withdrawal_id, action):
 
         new_status = "approved" if action == "approve" else "rejected"
         processed_at = (
-            datetime.now()
-            if DATABASE_URL
+            datetime.now() if DATABASE_URL
             else datetime.now().isoformat(sep=" ")
         )
 
@@ -1354,23 +1437,51 @@ def process_withdrawal(withdrawal_id, action):
         )
 
         if action == "reject":
-            cursor.execute(
-                f"UPDATE users SET points = points + {p} WHERE id = {p}",
-                (points, user_id)
-            )
-            record_transaction(
-                cursor, user_id, "withdrawal_refund",
-                points_change=points,
-                description=f"Refund for rejected withdrawal #{withdrawal_id}"
-            )
+            if amount_usd > 0:
+                cursor.execute(
+                    f"""
+                    UPDATE users
+                    SET usd_balance = usd_balance + {p}
+                    WHERE id = {p}
+                    """,
+                    (float(amount_usd), user_id)
+                )
+                record_transaction(
+                    cursor, user_id, "usd_withdrawal_refund",
+                    usd_change=amount_usd,
+                    description=(
+                        f"Refund for rejected {token} withdrawal "
+                        f"#{withdrawal_id}"
+                    )
+                )
+            elif points > 0:
+                # Refund older points-based withdrawal requests.
+                cursor.execute(
+                    f"UPDATE users SET points = points + {p} WHERE id = {p}",
+                    (points, user_id)
+                )
+                record_transaction(
+                    cursor, user_id, "withdrawal_refund",
+                    points_change=points,
+                    description=f"Refund for rejected withdrawal #{withdrawal_id}"
+                )
 
         conn.commit()
 
         if action == "approve":
-            flash("Withdrawal approved successfully.", "success")
+            if amount_usd > 0:
+                flash(
+                    f"Withdrawal #{withdrawal_id} marked approved. "
+                    f"Confirm you sent ${amount_usd:.2f} {token} to "
+                    f"{wallet_address} on {network}.",
+                    "success"
+                )
+            else:
+                flash("Older withdrawal approved.", "success")
         else:
             flash(
-                "Withdrawal rejected. Points returned to the user.",
+                "Withdrawal rejected. The USD or points have been returned "
+                "to the user's balance.",
                 "success"
             )
 
@@ -1378,7 +1489,6 @@ def process_withdrawal(withdrawal_id, action):
         conn.rollback()
         app.logger.exception("Withdrawal processing failed.")
         flash("Could not process this withdrawal.", "error")
-
     finally:
         cursor.close()
         conn.close()
@@ -1406,12 +1516,10 @@ def admin_login_history():
             "admin_login_history.html",
             attempts=attempts
         )
-
     except Exception:
         app.logger.exception("Admin login history failed.")
         flash("Could not load admin login history.", "error")
         return redirect(url_for("admin_dashboard"))
-
     finally:
         cursor.close()
         conn.close()
