@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6,19 +7,31 @@
   <title>Poly Earn - Watch Ad</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
+
 <body class="bg-[#0b0e14] text-white min-h-screen flex flex-col justify-between p-5">
+
   <div class="max-w-md w-full mx-auto flex justify-between items-center">
     <a href="/tasks" aria-label="Close ad page"
        class="w-10 h-10 bg-slate-800 border border-slate-700 rounded-full flex items-center justify-center">✕</a>
+
     <span id="countdown-badge"
       class="text-sm font-bold bg-purple-600/20 border border-purple-500/40 text-purple-300 px-4 py-2 rounded-full">00:30</span>
   </div>
 
   <div class="max-w-md w-full mx-auto bg-[#151922] border border-slate-800 rounded-3xl p-6 text-center space-y-6 my-auto">
-    <div class="w-20 h-20 bg-gradient-to-tr from-purple-600 to-indigo-500 rounded-3xl flex items-center justify-center mx-auto text-3xl">⚡</div>
+
+    <div class="w-20 h-20 bg-gradient-to-tr from-purple-600 to-indigo-500 rounded-3xl flex items-center justify-center mx-auto text-3xl">
+      ⚡
+    </div>
+
     <div>
-      <h2 id="status-heading" class="text-xl font-black">Ready to Watch an Advertisement</h2>
-      <p id="status-text" class="text-sm text-slate-400 mt-2">Tap the button below to open the advertisement in a new tab and start the 30-second timer.</p>
+      <h2 id="status-heading" class="text-xl font-black">
+        Ready to Watch an Advertisement
+      </h2>
+
+      <p id="status-text" class="text-sm text-slate-400 mt-2">
+        Tap below to open the advertisement and start the 30-second countdown.
+      </p>
     </div>
 
     <button id="start-button" type="button"
@@ -28,7 +41,9 @@
 
     <div id="timer-box" class="hidden py-3">
       <div id="countdown" class="text-5xl font-black text-amber-400">30</div>
+
       <p class="text-xs text-slate-500 mt-2">Seconds remaining</p>
+
       <div class="w-full bg-slate-700 rounded-full h-3 mt-5 overflow-hidden">
         <div id="progress" class="bg-purple-500 h-3 rounded-full" style="width:100%"></div>
       </div>
@@ -36,20 +51,27 @@
 
     <div id="finished" class="hidden py-4">
       <p class="text-emerald-400 font-bold">Countdown finished!</p>
-      <p class="text-sm text-slate-400 mt-2">Submitting your reward request...</p>
+      <p id="finish-message" class="text-sm text-slate-400 mt-2">
+        Checking your reward request...
+      </p>
     </div>
 
     <p id="error-text" class="hidden text-sm text-red-400" role="alert"></p>
+
     <form id="claim-form" action="/claim-reward" method="POST" class="hidden"></form>
   </div>
 
-  <div class="max-w-md w-full mx-auto text-center text-xs text-slate-600 pb-2">Poly Earn &copy; 2026</div>
+  <div class="max-w-md w-full mx-auto text-center text-xs text-slate-600 pb-2">
+    Poly Earn &copy; 2026
+  </div>
 
   <script>
     const AD_URL = "https://uplcm.com/4/12063392";
     const WATCH_SECONDS = 30;
+
     let timer = null;
     let started = false;
+    let startRequest = null;
 
     const startButton = document.getElementById("start-button");
     const countdown = document.getElementById("countdown");
@@ -58,62 +80,136 @@
     const statusHeading = document.getElementById("status-heading");
     const statusText = document.getElementById("status-text");
     const errorText = document.getElementById("error-text");
+    const timerBox = document.getElementById("timer-box");
+    const finished = document.getElementById("finished");
+    const finishMessage = document.getElementById("finish-message");
+    const claimForm = document.getElementById("claim-form");
 
-    startButton.addEventListener("click", async function () {
+    function showError(message) {
+      errorText.textContent = message;
+      errorText.classList.remove("hidden");
+    }
+
+    function startCountdown() {
+      let timeLeft = WATCH_SECONDS;
+
+      countdown.textContent = timeLeft;
+      badge.textContent = "00:30";
+      progress.style.width = "100%";
+
+      timerBox.classList.remove("hidden");
+
+      timer = setInterval(function () {
+        timeLeft = Math.max(0, timeLeft - 1);
+
+        countdown.textContent = timeLeft;
+        badge.textContent = "00:" + String(timeLeft).padStart(2, "0");
+        progress.style.width =
+          (timeLeft / WATCH_SECONDS * 100) + "%";
+
+        if (timeLeft <= 0) {
+          clearInterval(timer);
+          timer = null;
+
+          timerBox.classList.add("hidden");
+          finished.classList.remove("hidden");
+
+          statusHeading.textContent = "Countdown Finished";
+          statusText.textContent = "Submitting your reward request.";
+          badge.textContent = "DONE";
+
+          finishMessage.textContent = "Checking your reward request...";
+
+          claimForm.submit();
+        }
+      }, 1000);
+    }
+
+    startButton.addEventListener("click", function () {
       if (started) return;
+
       errorText.classList.add("hidden");
 
-      // Open synchronously inside the tap handler so mobile browsers are less
-      // likely to block the advertisement tab.
+      /*
+       * Open the ad directly inside the user's tap event.
+       * This helps prevent mobile browsers from blocking the popup.
+       */
       const adWindow = window.open(AD_URL, "_blank");
+
       if (!adWindow) {
-        errorText.textContent = "Your browser blocked the ad tab. Allow pop-ups for this site, then tap the button again.";
-        errorText.classList.remove("hidden");
+        showError(
+          "Your browser blocked the ad. Allow pop-ups for this site, then tap the button again."
+        );
         return;
       }
-      try { adWindow.opener = null; } catch (_) {}
-
-      startButton.disabled = true;
-      statusHeading.textContent = "Advertisement in Progress";
-      statusText.textContent = "Keep this page open while the 30-second countdown runs.";
 
       try {
-        const response = await fetch("/start-ad", {
-          method: "POST",
-          headers: { "X-Requested-With": "XMLHttpRequest" },
-          credentials: "same-origin"
-        });
-        const data = await response.json();
-        if (!response.ok || !data.ok) throw new Error(data.message || "Could not start the timer.");
-
-        started = true;
-        startButton.classList.add("hidden");
-        document.getElementById("timer-box").classList.remove("hidden");
-        let timeLeft = WATCH_SECONDS;
-
-        timer = setInterval(function () {
-          timeLeft = Math.max(0, timeLeft - 1);
-          countdown.textContent = timeLeft;
-          badge.textContent = "00:" + String(timeLeft).padStart(2, "0");
-          progress.style.width = (timeLeft / WATCH_SECONDS * 100) + "%";
-
-          if (timeLeft <= 0) {
-            clearInterval(timer);
-            document.getElementById("timer-box").classList.add("hidden");
-            document.getElementById("finished").classList.remove("hidden");
-            statusHeading.textContent = "Countdown Finished";
-            statusText.textContent = "Sending your reward request to the server.";
-            badge.textContent = "DONE";
-            document.getElementById("claim-form").submit();
-          }
-        }, 1000);
+        adWindow.opener = null;
       } catch (error) {
-        startButton.disabled = false;
-        statusHeading.textContent = "Could Not Start Timer";
-        errorText.textContent = error.message || "Please try again.";
-        errorText.classList.remove("hidden");
+        // The ad may be cross-origin; continue normally.
       }
+
+      started = true;
+      startButton.disabled = true;
+      startButton.classList.add("hidden");
+
+      statusHeading.textContent = "Advertisement in Progress";
+      statusText.textContent =
+        "Keep this page open while the 30-second countdown runs.";
+
+      /*
+       * Start the visible countdown immediately.
+       * The server request runs at the same time.
+       */
+      startCountdown();
+
+      startRequest = fetch("/start-ad", {
+        method: "POST",
+        headers: {
+          "X-Requested-With": "XMLHttpRequest"
+        },
+        credentials: "same-origin"
+      })
+      .then(async function (response) {
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+          throw new Error(
+            data.message || "The server could not start your reward session."
+          );
+        }
+
+        return data;
+      })
+      .catch(function (error) {
+        /*
+         * Do not submit a reward if the server did not authorize
+         * the reward session. The server must still validate claims.
+         */
+        if (timer) {
+          clearInterval(timer);
+          timer = null;
+        }
+
+        started = false;
+        startButton.disabled = false;
+        startButton.classList.remove("hidden");
+
+        timerBox.classList.add("hidden");
+        finished.classList.add("hidden");
+
+        badge.textContent = "00:30";
+        countdown.textContent = "30";
+        progress.style.width = "100%";
+
+        statusHeading.textContent = "Could Not Start Reward Session";
+        statusText.textContent =
+          "The advertisement opened, but the server could not authorize this session.";
+
+        showError(error.message || "Please try again.");
+      });
     });
   </script>
+
 </body>
 </html>
