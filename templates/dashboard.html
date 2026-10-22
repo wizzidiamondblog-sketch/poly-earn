@@ -62,8 +62,10 @@
       </a>
     </section>
 
+    <!-- POINTS AND USD WALLET -->
     <section class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
+      <!-- POLY POINTS -->
       <div class="rounded-2xl p-5 border border-purple-500/30 bg-gradient-to-br from-purple-900/40 to-[#151922]">
         <div class="flex justify-between items-start">
           <div>
@@ -85,6 +87,7 @@
         </div>
       </div>
 
+      <!-- USD WALLET -->
       <div class="rounded-2xl p-5 border border-emerald-500/30 bg-gradient-to-br from-emerald-900/30 to-[#151922]">
         <div class="flex justify-between items-start">
           <div>
@@ -97,14 +100,26 @@
           <div class="text-3xl">💵</div>
         </div>
 
+        <!-- EXISTING REDEEM BUTTON - UNCHANGED -->
         <a href="/redeem"
            class="block text-center mt-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 font-bold text-sm">
           Redeem Points
         </a>
+
+        <!-- NEW WITHDRAW BUTTON -->
+        <a href="/withdraw"
+           class="block text-center mt-3 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 font-bold text-sm">
+          💸 Withdraw Funds
+        </a>
+
+        <p class="text-xs text-slate-400 text-center mt-3">
+          Minimum withdrawal $50 · At least 3 active referrals required
+        </p>
       </div>
 
     </section>
 
+    <!-- QUICK ACTIONS -->
     <section>
       <div class="flex justify-between items-center mb-3">
         <h2 class="text-lg font-bold">Quick Actions</h2>
@@ -143,7 +158,8 @@
 
       </div>
     </section>
-    
+
+    <!-- WATCH ADS -->
     <section class="bg-[#151922] border border-slate-800 rounded-2xl p-5">
       <div class="flex justify-between items-center gap-3">
         <div>
@@ -172,6 +188,7 @@
       </a>
     </section>
 
+    <!-- ACCOUNT -->
     <section class="bg-[#151922] border border-slate-800 rounded-2xl p-4 flex items-center justify-between gap-3">
       <div>
         <h2 class="font-bold">Your Account</h2>
@@ -189,6 +206,7 @@
 
   </main>
 
+  <!-- BOTTOM NAVIGATION -->
   <nav class="fixed bottom-0 inset-x-0 z-40 bg-[#0b0e14]/95 backdrop-blur border-t border-slate-800">
     <div class="max-w-5xl mx-auto grid grid-cols-5 px-2 py-2">
 
@@ -207,6 +225,7 @@
         <span class="text-[10px]">Invite</span>
       </a>
 
+      <!-- EXISTING REDEEM NAVIGATION - UNCHANGED -->
       <a href="/redeem" class="flex flex-col items-center gap-1 text-slate-400 hover:text-white py-1">
         <span class="text-xl">💳</span>
         <span class="text-[10px]">Redeem</span>
@@ -221,4 +240,5 @@
   </nav>
 
 </body>
-</html>
+  </html>
+  
