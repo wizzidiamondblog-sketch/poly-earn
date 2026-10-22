@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Poly Earn - Withdraw</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <meta name="theme-color" content="#0b0e14">
+</head>
+
+<body class="bg-[#0b0e14] text-white min-h-screen font-sans pb-24">
+
+  <header class="border-b border-white/10 p-5">
+    <div class="max-w-xl mx-auto flex items-center justify-between">
+      <a href="{{ url_for('dashboard') }}"
+         class="text-gray-400 hover:text-white">
+        ← Back
+      </a>
+      <h1 class="text-xl font-bold">Withdraw</h1>
+      <div class="w-10"></div>
+    </div>
+  </header>
+
+  <main class="max-w-xl mx-auto p-5 space-y-5">
+
+    <section class="bg-[#151a23] border border-white/10 rounded-2xl p-5">
+      <p class="text-gray-400 text-sm">Your USD Balance</p>
+      <h2 class="text-3xl font-bold mt-2">
+        ${{ "%.2f"|format(usd_balance|default(0)|float) }}
+      </h2>
+      <p class="text-gray-400 text-sm mt-2">
+        Minimum withdrawal: $50.00
+      </p>
+    </section>
+
+    <section class="bg-[#151a23] border border-white/10 rounded-2xl p-5">
+      <h2 class="font-bold text-lg mb-3">Withdrawal Requirements</h2>
+
+      <div class="space-y-3 text-sm">
+        <div class="flex justify-between gap-3">
+          <span class="text-gray-400">Minimum withdrawal</span>
+          <span class="font-semibold">$50.00</span>
+        </div>
+
+        <div class="flex justify-between gap-3">
+          <span class="text-gray-400">Active referrals required</span>
+          <span class="font-semibold">3</span>
+        </div>
+
+        <div class="flex justify-between gap-3">
+          <span class="text-gray-400">Payment token</span>
+          <span class="font-semibold">USDT</span>
+        </div>
+
+        <div class="flex justify-between gap-3">
+          <span class="text-gray-400">Network</span>
+          <span class="font-semibold">Polygon</span>
+        </div>
+      </div>
+    </section>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="rounded-xl p-4 text-sm
+            {% if category == 'success' %}
+              bg-green-500/10 border border-green-500/30 text-green-300
+            {% else %}
+              bg-red-500/10 border border-red-500/30 text-red-300
+            {% endif %}">
+            {{ message }}
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <section class="bg-[#151a23] border border-white/10 rounded-2xl p-5">
+      <h2 class="text-lg font-bold mb-4">Request Withdrawal</h2>
+
+      <form method="POST"
+            action="{{ url_for('withdraw') }}"
+            class="space-y-4">
+
+        <div>
+          <label for="amount" class="block text-sm text-gray-300 mb-2">
+            Withdrawal amount (USD)
+          </label>
+
+          <input
+            id="amount"
+            name="amount"
+            type="number"
+            min="50"
+            step="0.01"
+            required
+            placeholder="50.00"
+            class="w-full rounded-xl bg-[#0b0e14] border border-white/10 p-3 outline-none focus:border-blue-500"
+          >
+        </div>
+
+        <div>
+          <label for="wallet_address"
+                 class="block text-sm text-gray-300 mb-2">
+            USDT Polygon wallet address
+          </label>
+
+          <input
+            id="wallet_address"
+            name="wallet_address"
+            type="text"
+            required
+            placeholder="Enter your Polygon wallet address"
+            class="w-full rounded-xl bg-[#0b0e14] border border-white/10 p-3 outline-none focus:border-blue-500"
+          >
+
+          <p class="text-xs text-gray-500 mt-2">
+            Confirm say your wallet supports USDT on the Polygon network.
+          </p>
+        </div>
+
+        <button
+          type="submit"
+          class="w-full rounded-xl bg-blue-600 hover:bg-blue-500 p-3 font-bold transition">
+          Submit Withdrawal Request
+        </button>
+
+      </form>
+    </section>
+
+    <p class="text-xs text-gray-500 text-center leading-5">
+      Withdrawal requests are subject to Poly Earn's eligibility checks
+      and admin review. Submitting a request does not guarantee payment.
+    </p>
+
+  </main>
+
+  <nav class="fixed bottom-0 left-0 right-0 bg-[#10141c] border-t border-white/10">
+    <div class="max-w-xl mx-auto grid grid-cols-3 text-center text-xs">
+      <a href="{{ url_for('dashboard') }}"
+         class="p-4 text-gray-400">Home</a>
+      <a href="{{ url_for('tasks') }}"
+         class="p-4 text-gray-400">Earn</a>
+      <a href="{{ url_for('withdraw') }}"
+         class="p-4 text-blue-400 font-bold">Withdraw</a>
+    </div>
+  </nav>
+
+</body>
+    </html>
