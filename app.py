@@ -1,4 +1,3 @@
-
 import os
 import time
 import sqlite3
@@ -86,6 +85,7 @@ def init_db():
                     points INTEGER NOT NULL DEFAULT 0,
                     ads_watched_count INTEGER NOT NULL DEFAULT 0,
                     last_ad_time TIMESTAMP,
+                    ad_window_started_at TIMESTAMP,
                     is_admin BOOLEAN NOT NULL DEFAULT FALSE,
                     usd_balance NUMERIC(12,2) NOT NULL DEFAULT 0,
                     referral_code VARCHAR(32),
@@ -98,6 +98,7 @@ def init_db():
                 ("points", "INTEGER NOT NULL DEFAULT 0"),
                 ("ads_watched_count", "INTEGER NOT NULL DEFAULT 0"),
                 ("last_ad_time", "TIMESTAMP"),
+                ("ad_window_started_at", "TIMESTAMP"),
                 ("is_admin", "BOOLEAN NOT NULL DEFAULT FALSE"),
                 ("usd_balance", "NUMERIC(12,2) NOT NULL DEFAULT 0"),
                 ("referral_code", "VARCHAR(32)"),
@@ -154,6 +155,7 @@ def init_db():
                     points INTEGER NOT NULL DEFAULT 0,
                     ads_watched_count INTEGER NOT NULL DEFAULT 0,
                     last_ad_time TEXT,
+                    ad_window_started_at TEXT,
                     is_admin INTEGER NOT NULL DEFAULT 0,
                     usd_balance NUMERIC NOT NULL DEFAULT 0,
                     referral_code TEXT,
@@ -170,6 +172,7 @@ def init_db():
                 ("points", "INTEGER NOT NULL DEFAULT 0"),
                 ("ads_watched_count", "INTEGER NOT NULL DEFAULT 0"),
                 ("last_ad_time", "TEXT"),
+                ("ad_window_started_at", "TEXT"),
                 ("is_admin", "INTEGER NOT NULL DEFAULT 0"),
                 ("usd_balance", "NUMERIC NOT NULL DEFAULT 0"),
                 ("referral_code", "TEXT"),
@@ -302,7 +305,7 @@ def get_user_ad_status(user_id):
     try:
         cursor.execute(
             f"""
-            SELECT ads_watched_count, last_ad_time
+            SELECT ads_watched_count, ad_window_started_at
             FROM users WHERE id = {p}
             """,
             (user_id,)
@@ -313,17 +316,24 @@ def get_user_ad_status(user_id):
             return None
 
         count = row[0] or 0
-        last_time = parse_datetime(row[1])
+        window_start = parse_datetime(row[1])
+        now = datetime.now()
 
-        if last_time and datetime.now() - last_time >= AD_WINDOW:
+        if window_start and now - window_start >= AD_WINDOW:
             cursor.execute(
-                f"UPDATE users SET ads_watched_count = 0 WHERE id = {p}",
+                f"""
+                UPDATE users
+                SET ads_watched_count = 0,
+                    ad_window_started_at = NULL
+                WHERE id = {p}
+                """,
                 (user_id,)
             )
             conn.commit()
             count = 0
+            window_start = None
 
-        return count, last_time
+        return count, window_start
 
     finally:
         cursor.close()
@@ -368,9 +378,7 @@ def record_admin_login_attempt(email, success):
         if cursor:
             cursor.close()
         if conn:
-            conn.close()
-
-@app.route("/")
+            conn.close()@app.route("/")
 def home():
     if "user_id" in session:
         return redirect(url_for("dashboard"))
@@ -583,7 +591,8 @@ def dashboard():
     try:
         cursor.execute(
             f"""
-            SELECT points, ads_watched_count, last_ad_time, usd_balance
+            SELECT points, ads_watched_count,
+                   ad_window_started_at, usd_balance
             FROM users WHERE id = {p}
             """,
             (session["user_id"],)
@@ -596,16 +605,22 @@ def dashboard():
 
         points = row[0] or 0
         count = row[1] or 0
-        last_time = parse_datetime(row[2])
+        window_start = parse_datetime(row[2])
         usd_balance = float(row[3] or 0)
 
-        if last_time and datetime.now() - last_time >= AD_WINDOW:
+        if window_start and datetime.now() - window_start >= AD_WINDOW:
             cursor.execute(
-                f"UPDATE users SET ads_watched_count = 0 WHERE id = {p}",
+                f"""
+                UPDATE users
+                SET ads_watched_count = 0,
+                    ad_window_started_at = NULL
+                WHERE id = {p}
+                """,
                 (session["user_id"],)
             )
             conn.commit()
             count = 0
+            window_start = None
 
         usd_value = float(
             (Decimal(points) * Decimal("0.005")).quantize(
@@ -629,32 +644,81 @@ def dashboard():
 
     finally:
         cursor.close()
-        conn.close()
-
-
-@app.route("/watch-ad")
+        conn.close()@app.route("/watch-ad")
 def watch_ad():
     if "user_id" not in session:
         return redirect(url_for("login"))
 
-    try:
-        status = get_user_ad_status(session["user_id"])
+    conn = get_db()
+    cursor = conn.cursor()
+    p = placeholder()
 
-        if status is None:
+    try:
+        if DATABASE_URL:
+            cursor.execute(
+                """
+                SELECT ads_watched_count, ad_window_started_at
+                FROM users WHERE id = %s FOR UPDATE
+                """,
+                (session["user_id"],)
+            )
+        else:
+            cursor.execute("BEGIN IMMEDIATE")
+            cursor.execute(
+                """
+                SELECT ads_watched_count, ad_window_started_at
+                FROM users WHERE id = ?
+                """,
+                (session["user_id"],)
+            )
+
+        row = cursor.fetchone()
+
+        if not row:
+            conn.rollback()
             session.clear()
             return redirect(url_for("login"))
 
-        if status[0] >= MAX_ADS:
-            flash("You have reached 25 ads in this 2-hour window.", "error")
-            return redirect(url_for("dashboard"))
+        count = row[0] or 0
+        window_start = parse_datetime(row[1])
+        now = datetime.now()
 
+        if window_start and now - window_start >= AD_WINDOW:
+            count = 0
+            window_start = None
+
+        if count >= MAX_ADS:
+            conn.rollback()
+            flash("You have reached 25 ads in this 2-hour window.", "error")
+            return redirect(url_for("tasks"))
+
+        # Start the two-hour window when the first ad page opens.
+        if window_start is None:
+            timestamp = now if DATABASE_URL else now.isoformat(sep=" ")
+
+            cursor.execute(
+                f"""
+                UPDATE users
+                SET ads_watched_count = {p},
+                    ad_window_started_at = {p}
+                WHERE id = {p}
+                """,
+                (count, timestamp, session["user_id"])
+            )
+
+        conn.commit()
         session["ad_page_opened_at"] = time.time()
         return render_template("watch_ad.html")
 
     except Exception:
+        conn.rollback()
         app.logger.exception("Watch-ad page failed.")
         flash("Could not open the ad page.", "error")
         return redirect(url_for("dashboard"))
+
+    finally:
+        cursor.close()
+        conn.close()
 
 
 @app.route("/claim-reward", methods=["POST"])
@@ -676,7 +740,7 @@ def claim_reward():
         if DATABASE_URL:
             cursor.execute(
                 """
-                SELECT points, ads_watched_count, last_ad_time
+                SELECT points, ads_watched_count, ad_window_started_at
                 FROM users WHERE id = %s FOR UPDATE
                 """,
                 (session["user_id"],)
@@ -685,7 +749,7 @@ def claim_reward():
             cursor.execute("BEGIN IMMEDIATE")
             cursor.execute(
                 """
-                SELECT points, ads_watched_count, last_ad_time
+                SELECT points, ads_watched_count, ad_window_started_at
                 FROM users WHERE id = ?
                 """,
                 (session["user_id"],)
@@ -698,33 +762,49 @@ def claim_reward():
             session.clear()
             return redirect(url_for("login"))
 
-        points, count, last_time = row
-        count = count or 0
-        last_time = parse_datetime(last_time)
+        points = row[0] or 0
+        count = row[1] or 0
+        window_start = parse_datetime(row[2])
+        now = datetime.now()
 
-        if last_time and datetime.now() - last_time >= AD_WINDOW:
+        if window_start and now - window_start >= AD_WINDOW:
             count = 0
+            window_start = None
 
         if count >= MAX_ADS:
             conn.rollback()
             session.pop("ad_page_opened_at", None)
             flash("You have reached the 25-ad limit.", "error")
-            return redirect(url_for("dashboard"))
+            return redirect(url_for("tasks"))
 
-        now = datetime.now()
-        timestamp = now if DATABASE_URL else now.isoformat(sep=" ")
+        # Start a fresh window if the previous one expired.
+        if window_start is None:
+            window_start = now
+
+        window_timestamp = (
+            window_start if DATABASE_URL
+            else window_start.isoformat(sep=" ")
+        )
+        ad_timestamp = (
+            now if DATABASE_URL
+            else now.isoformat(sep=" ")
+        )
 
         cursor.execute(
             f"""
             UPDATE users
             SET points = points + {p},
                 ads_watched_count = {p},
+                ad_window_started_at = {p},
                 last_ad_time = {p}
             WHERE id = {p}
             """,
             (
-                POINTS_PER_AD, count + 1,
-                timestamp, session["user_id"]
+                POINTS_PER_AD,
+                count + 1,
+                window_timestamp,
+                ad_timestamp,
+                session["user_id"]
             )
         )
 
@@ -748,15 +828,34 @@ def claim_reward():
         conn.close()
 
     return redirect(url_for("dashboard"))
-            
+
+
 @app.route("/tasks")
 def tasks():
     if "user_id" not in session:
         return redirect(url_for("login"))
 
+    status = get_user_ad_status(session["user_id"])
+
+    if status is None:
+        session.clear()
+        return redirect(url_for("login"))
+
+    count, window_start = status
+    remaining_seconds = 0
+
+    if window_start:
+        elapsed = (datetime.now() - window_start).total_seconds()
+        remaining_seconds = max(
+            0,
+            int(AD_WINDOW.total_seconds() - elapsed)
+        )
+
     return render_template(
         "tasks.html",
-        username=session.get("username", "User")
+        username=session.get("username", "User"),
+        ads_watched=count,
+        remaining_seconds=remaining_seconds
     )
 
 
@@ -938,10 +1037,7 @@ def redeem():
 
     finally:
         cursor.close()
-        conn.close()
-
-
-@app.route("/profile")
+        conn.close()@app.route("/profile")
 def profile():
     if "user_id" not in session:
         return redirect(url_for("login"))
@@ -1051,7 +1147,8 @@ def history():
     finally:
         cursor.close()
         conn.close()
-        
+
+
 @app.route("/withdraw", methods=["POST"])
 def withdraw():
     if "user_id" not in session:
@@ -1335,4 +1432,3 @@ def logout():
 
 # Initialize database tables on application startup.
 init_db()
-    
