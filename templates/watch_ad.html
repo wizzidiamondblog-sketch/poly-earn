@@ -8,117 +8,116 @@
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 
-<body class="bg-[#0b0e14] text-white min-h-screen p-4">
+<body class="bg-[#0b0e14] text-white min-h-screen flex flex-col justify-between p-5">
 
-  <div class="max-w-md mx-auto">
+  <div class="max-w-md w-full mx-auto flex justify-between items-center">
+    <a href="/dashboard"
+       class="w-10 h-10 bg-slate-800 border border-slate-700 rounded-full flex items-center justify-center">
+      ✕
+    </a>
 
-    <div class="flex justify-between items-center mb-4">
-      <a href="/dashboard"
-         class="bg-slate-800 rounded-full px-4 py-2">
-        ✕ Back
-      </a>
+    <span id="countdown-badge"
+      class="text-sm font-bold bg-purple-600/20 border border-purple-500/40 text-purple-300 px-4 py-2 rounded-full">
+      00:30
+    </span>
+  </div>
 
-      <div id="countdown-badge"
-           class="bg-purple-600/20 border border-purple-500/40
-                  text-purple-300 px-4 py-2 rounded-full font-bold">
-        00:30
-      </div>
+  <div class="max-w-md w-full mx-auto bg-[#151922] border border-slate-800 rounded-3xl p-6 text-center space-y-6 my-auto">
+
+    <div class="w-20 h-20 bg-gradient-to-tr from-purple-600 to-indigo-500 rounded-3xl flex items-center justify-center mx-auto text-3xl">
+      ⚡
     </div>
 
-    <div class="bg-[#151922] border border-slate-800
-                rounded-2xl p-4 text-center">
-
-      <h2 id="status-heading" class="text-xl font-bold mb-2">
-        Watch Advertisement
+    <div>
+      <h2 id="status-heading" class="text-xl font-black">
+        Advertisement in Progress
       </h2>
 
-      <p id="status-text" class="text-sm text-slate-400 mb-4">
-        Your countdown starts below.
+      <p id="status-text" class="text-sm text-slate-400 mt-2">
+        The advertisement is opening in another tab. Return here to see your countdown.
       </p>
-
-      <!-- Countdown displayed above the ad -->
-      <div class="sticky top-0 z-10 bg-[#151922] py-3">
-        <div class="flex justify-between text-sm mb-2">
-          <span>Time remaining</span>
-          <span id="countdown" class="text-amber-400 font-bold">
-            30 seconds
-          </span>
-        </div>
-
-        <div class="w-full bg-slate-700 rounded-full h-3 overflow-hidden">
-          <div id="progress"
-               class="bg-purple-500 h-3 rounded-full"
-               style="width:100%">
-          </div>
-        </div>
-      </div>
-
-      <!-- Embedded ad attempt -->
-      <div class="mt-4 rounded-xl overflow-hidden
-                  border border-slate-700 bg-black">
-
-        <iframe
-          id="ad-frame"
-          src="https://uplcm.com/4/12063392"
-          title="Advertisement"
-          class="w-full"
-          style="height:500px;border:0"
-          allow="autoplay"
-          referrerpolicy="strict-origin-when-cross-origin">
-        </iframe>
-
-      </div>
-
-      <div id="finished" class="hidden mt-5">
-        <p class="text-emerald-400 font-bold">
-          Countdown finished.
-        </p>
-        <p class="text-sm text-slate-400 mt-1">
-          Processing your reward...
-        </p>
-      </div>
-
-      <form id="claim-form" action="/claim-reward"
-            method="POST" class="hidden">
-      </form>
-
     </div>
 
-    <p class="text-center text-xs text-slate-600 mt-5">
-      Poly Earn &copy; 2026
-    </p>
+    <div id="timer-box" class="py-3">
+      <div id="countdown" class="text-5xl font-black text-amber-400">
+        30
+      </div>
+
+      <p class="text-xs text-slate-500 mt-2">
+        Seconds remaining
+      </p>
+
+      <div class="w-full bg-slate-700 rounded-full h-3 mt-5 overflow-hidden">
+        <div id="progress" class="bg-purple-500 h-3 rounded-full"
+             style="width:100%">
+        </div>
+      </div>
+    </div>
+
+    <div id="finished" class="hidden py-4">
+      <p class="text-emerald-400 font-bold">
+        Countdown finished!
+      </p>
+      <p class="text-sm text-slate-400 mt-2">
+        Processing your reward...
+      </p>
+    </div>
+
+    <form id="claim-form" action="/claim-reward" method="POST" class="hidden">
+    </form>
 
   </div>
 
+  <div class="max-w-md w-full mx-auto text-center text-xs text-slate-600 pb-2">
+    Poly Earn &copy; 2026
+  </div>
+
   <script>
+    const AD_URL = "https://uplcm.com/4/12063392";
+
     let timeLeft = 30;
+    let adOpened = false;
 
     const countdown = document.getElementById("countdown");
     const badge = document.getElementById("countdown-badge");
     const progress = document.getElementById("progress");
 
+    // Open the ad after a user taps the Watch Ad link.
+    // Some browsers may block automatic pop-ups.
+    window.addEventListener("load", function () {
+      const adWindow = window.open(AD_URL, "_blank");
+
+      if (adWindow) {
+        adOpened = true;
+      } else {
+        document.getElementById("status-text").textContent =
+          "Your browser blocked the advertisement tab. Allow pop-ups for this website and try again.";
+      }
+    });
+
     const timer = setInterval(function () {
       timeLeft = Math.max(0, timeLeft - 1);
 
-      countdown.textContent = timeLeft + " seconds";
-      badge.textContent =
-        "00:" + String(timeLeft).padStart(2, "0");
-
+      countdown.textContent = timeLeft;
+      badge.textContent = "00:" + String(timeLeft).padStart(2, "0");
       progress.style.width = (timeLeft / 30 * 100) + "%";
 
       if (timeLeft === 0) {
         clearInterval(timer);
 
+        document.getElementById("timer-box").classList.add("hidden");
         document.getElementById("finished").classList.remove("hidden");
+
         document.getElementById("status-heading").textContent =
           "Countdown Finished";
 
         document.getElementById("status-text").textContent =
-          "Processing your reward.";
+          "Your countdown has ended.";
 
-        setTimeout(function () {
-          document.getElementById("claim-form").submit();
-        }, 500);
+        badge.textContent = "DONE";
+
+        // Do not automatically award points just because time elapsed.
+        // Reward verification should be handled by an approved ad system.
       }
     }, 1000);
   </script>
