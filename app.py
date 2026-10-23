@@ -4,7 +4,10 @@ import sqlite3
 import logging
 import secrets
 import psycopg2
-
+import smtplib
+import ssl
+from email.message import EmailMessage
+from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from datetime import datetime, timedelta
 from decimal import Decimal, ROUND_HALF_UP, InvalidOperation
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
@@ -1416,7 +1419,7 @@ def change_password():
             cursor.close()
             conn.close()
 
-    return render_template("reset_password.html")
+    return render_template("change_password.html")
 
 
 # Initialize database tables when the application starts.
