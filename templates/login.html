@@ -37,7 +37,7 @@
         <input type="password" name="password" placeholder="Enter password" required class="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-white placeholder-slate-600 focus:outline-none focus:border-indigo-500 transition-all">
 
         <div class="text-right mt-3">
-          <a href="/reset-password" class="text-indigo-400 text-sm font-semibold hover:underline">
+          <a href="{{ url_for('forgot_password') }}" class="text-indigo-400 text-sm font-semibold hover:underline">
             Forgot Password?
           </a>
         </div>
