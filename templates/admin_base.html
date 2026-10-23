@@ -1,0 +1,45 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Poly Earn Admin - {% block title %}Dashboard{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <meta name="theme-color" content="#07130f">
+</head>
+
+<body class="min-h-screen bg-[#07130f] text-white">
+  <div class="min-h-screen md:flex">
+
+    <aside class="border-b border-emerald-900 bg-[#0b1c16] p-4 md:min-h-screen md:w-64 md:border-b-0 md:border-r">
+      <a href="{{ url_for('admin_dashboard') }}" class="text-2xl font-extrabold text-emerald-400">
+        Poly Earn
+      </a>
+      <p class="mt-1 text-xs text-slate-400">Administration Panel</p>
+
+      <nav class="mt-6 grid grid-cols-2 gap-2 md:grid-cols-1">
+        <a href="{{ url_for('admin_dashboard') }}" class="rounded-lg bg-emerald-900/40 p-3 hover:bg-emerald-800">Overview</a>
+        <a href="{{ url_for('admin_users') }}" class="rounded-lg p-3 hover:bg-emerald-900/40">Users</a>
+        <a href="{{ url_for('admin_withdrawals') }}" class="rounded-lg p-3 hover:bg-emerald-900/40">Withdrawals</a>
+        <a href="{{ url_for('admin_transactions') }}" class="rounded-lg p-3 hover:bg-emerald-900/40">Transactions</a>
+        <a href="{{ url_for('admin_settings') }}" class="rounded-lg p-3 hover:bg-emerald-900/40">Settings</a>
+        <a href="{{ url_for('admin_announcements') }}" class="rounded-lg p-3 hover:bg-emerald-900/40">Announcements</a>
+        <a href="{{ url_for('admin_support') }}" class="rounded-lg p-3 hover:bg-emerald-900/40">Support</a>
+        <a href="{{ url_for('admin_security') }}" class="rounded-lg p-3 hover:bg-emerald-900/40">Security</a>
+        <a href="{{ url_for('admin_reports') }}" class="rounded-lg p-3 hover:bg-emerald-900/40">Reports</a>
+        <a href="{{ url_for('admin_login_history') }}" class="rounded-lg p-3 hover:bg-emerald-900/40">Login History</a>
+      </nav>
+
+      <a href="{{ url_for('logout') }}" class="mt-6 block rounded-lg border border-red-900 p-3 text-center text-red-300 hover:bg-red-950">
+        Log Out
+      </a>
+    </aside>
+
+    <main class="min-w-0 flex-1 p-4 sm:p-6 lg:p-8">
+      {% block content %}{% endblock %}
+    </main>
+
+  </div>
+</body>
+</html>
