@@ -1452,6 +1452,111 @@ def send_password_reset_email(email, token):
         server.ehlo()
         server.login(BREVO_SMTP_LOGIN, BREVO_SMTP_KEY)
         server.send_message(message)
+
+@app.route("/forgot-password", methods=["GET", "POST"])
+def forgot_password():
+    if request.method == "POST":
+        email = (request.form.get("email") or "").strip().lower()
+
+        if not email or len(email) > 120:
+            flash("Enter a valid email address.", "error")
+            return redirect(url_for("forgot_password"))
+
+        conn = get_db()
+        cursor = conn.cursor()
+        p = placeholder()
+
+        try:
+            cursor.execute(
+                f"SELECT id, password FROM users WHERE LOWER(email) = {p}",
+                (email,)
+            )
+            user = cursor.fetchone()
+
+            if user and MAIL_FROM and BREVO_SMTP_LOGIN and BREVO_SMTP_KEY:
+                token = password_reset_serializer.dumps({
+                    "user_id": user[0],
+                    "password": user[1]
+                })
+
+                try:
+                    send_password_reset_email(email, token)
+                except Exception:
+                    app.logger.exception("Could not send password reset email.")
+
+            elif user:
+                app.logger.error("Password reset email settings are missing.")
+
+        except Exception:
+            app.logger.exception("Forgot-password request failed.")
+        finally:
+            cursor.close()
+            conn.close()
+
+        flash(
+            "If an account with that email exists, a password reset link will be sent shortly.",
+            "success"
+        )
+        return redirect(url_for("forgot_password"))
+
+    return render_template("forgot_password.html")
+
+@app.route("/reset-password/<token>", methods=["GET", "POST"])
+def reset_password(token):
+    try:
+        data = password_reset_serializer.loads(token, max_age=1800)
+        user_id = int(data.get("user_id"))
+        token_password = data.get("password")
+    except SignatureExpired:
+        flash("This reset link has expired. Please request another one.", "error")
+        return redirect(url_for("forgot_password"))
+    except (BadSignature, ValueError, TypeError, AttributeError):
+        flash("This reset link is invalid. Please request another one.", "error")
+        return redirect(url_for("forgot_password"))
+
+    conn = get_db()
+    cursor = conn.cursor()
+    p = placeholder()
+
+    try:
+        cursor.execute(
+            f"SELECT password FROM users WHERE id = {p}",
+            (user_id,)
+        )
+        user = cursor.fetchone()
+
+        if not user or user[0] != token_password:
+            flash("This reset link is no longer valid. Please request another one.", "error")
+            return redirect(url_for("forgot_password"))
+
+        if request.method == "POST":
+            new_password = request.form.get("new_password") or ""
+            confirm_password = request.form.get("confirm_password") or ""
+
+            if len(new_password) < 8:
+                flash("Password must be at least 8 characters.", "error")
+            elif new_password != confirm_password:
+                flash("The new passwords do not match.", "error")
+            else:
+                hashed_password = generate_password_hash(new_password)
+                cursor.execute(
+                    f"UPDATE users SET password = {p} WHERE id = {p}",
+                    (hashed_password, user_id)
+                )
+                conn.commit()
+                flash("Password reset successfully. Please log in.", "success")
+                return redirect(url_for("login"))
+
+        return render_template("reset_password.html", token=token)
+
+    except Exception:
+        conn.rollback()
+        app.logger.exception("Password reset failed.")
+        flash("Could not reset your password. Please try again.", "error")
+        return redirect(url_for("forgot_password"))
+    finally:
+        cursor.close()
+        conn.close()
         
 # Initialize database tables when the application starts.
 init_db()
