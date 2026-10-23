@@ -1,0 +1,198 @@
+
+{% extends "admin_base.html" %}
+
+{% block title %}Admin Overview{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div>
+      <h1 class="text-2xl sm:text-3xl font-bold">Dashboard Overview</h1>
+      <p class="text-slate-400 mt-1">Welcome to your Poly Earn administration panel.</p>
+    </div>
+    <a href="{{ url_for('admin_withdrawals') }}"
+       class="inline-flex items-center justify-center rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-5 py-3">
+      Manage Withdrawals
+    </a>
+  </div>
+
+  <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+
+    <div class="rounded-2xl border border-slate-700 bg-slate-900 p-5">
+      <p class="text-sm text-slate-400">Total Users</p>
+      <p class="text-3xl font-bold mt-3">{{ total_users|default(0) }}</p>
+      <p class="text-xs text-emerald-400 mt-2">Registered accounts</p>
+    </div>
+
+    <div class="rounded-2xl border border-slate-700 bg-slate-900 p-5">
+      <p class="text-sm text-slate-400">Total USD Balance</p>
+      <p class="text-3xl font-bold mt-3">${{ "%.2f"|format(total_usd_balance|default(0)|float) }}</p>
+      <p class="text-xs text-blue-400 mt-2">User account balances</p>
+    </div>
+
+    <div class="rounded-2xl border border-slate-700 bg-slate-900 p-5">
+      <p class="text-sm text-slate-400">Total Withdrawals</p>
+      <p class="text-3xl font-bold mt-3">{{ withdrawals|default([])|length }}</p>
+      <p class="text-xs text-amber-400 mt-2">All withdrawal requests</p>
+    </div>
+
+    <div class="rounded-2xl border border-slate-700 bg-slate-900 p-5">
+      <p class="text-sm text-slate-400">Admin Status</p>
+      <p class="text-2xl font-bold text-emerald-400 mt-3">Active</p>
+      <p class="text-xs text-slate-400 mt-2">Administration panel</p>
+    </div>
+
+  </div>
+
+  <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+
+    <section class="rounded-2xl border border-slate-700 bg-slate-900 overflow-hidden">
+      <div class="flex items-center justify-between gap-3 p-5 border-b border-slate-700">
+        <div>
+          <h2 class="text-lg font-bold">Recent Users</h2>
+          <p class="text-sm text-slate-400 mt-1">Latest registered accounts</p>
+        </div>
+        <a href="{{ url_for('admin_users') }}"
+           class="text-sm text-emerald-400 hover:text-emerald-300">View all</a>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm text-left">
+          <thead class="bg-slate-800 text-slate-400">
+            <tr>
+              <th class="px-4 py-3">Username</th>
+              <th class="px-4 py-3">Email</th>
+              <th class="px-4 py-3">Points</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-800">
+            {% for user in users[:5] %}
+            <tr>
+              <td class="px-4 py-4 font-semibold">{{ user[1] }}</td>
+              <td class="px-4 py-4 text-slate-400">{{ user[2] }}</td>
+              <td class="px-4 py-4 text-emerald-400">{{ user[3] }}</td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="3" class="px-4 py-8 text-center text-slate-400">
+                No users found yet.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="rounded-2xl border border-slate-700 bg-slate-900 overflow-hidden">
+      <div class="flex items-center justify-between gap-3 p-5 border-b border-slate-700">
+        <div>
+          <h2 class="text-lg font-bold">Recent Withdrawals</h2>
+          <p class="text-sm text-slate-400 mt-1">Review user withdrawal requests</p>
+        </div>
+        <a href="{{ url_for('admin_withdrawals') }}"
+           class="text-sm text-emerald-400 hover:text-emerald-300">Manage</a>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm text-left">
+          <thead class="bg-slate-800 text-slate-400">
+            <tr>
+              <th class="px-4 py-3">User</th>
+              <th class="px-4 py-3">Amount</th>
+              <th class="px-4 py-3">Status</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-800">
+            {% for item in withdrawals[:5] %}
+            <tr>
+              <td class="px-4 py-4 font-semibold">{{ item[1] }}</td>
+              <td class="px-4 py-4">${{ "%.2f"|format(item[6]|default(0)|float) }}</td>
+              <td class="px-4 py-4">
+                {% if item[4]|string|lower == 'approved' %}
+                  <span class="rounded-full bg-emerald-500/10 text-emerald-400 px-3 py-1 text-xs">Approved</span>
+                {% elif item[4]|string|lower == 'rejected' %}
+                  <span class="rounded-full bg-red-500/10 text-red-400 px-3 py-1 text-xs">Rejected</span>
+                {% else %}
+                  <span class="rounded-full bg-amber-500/10 text-amber-400 px-3 py-1 text-xs">{{ item[4] }}</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="3" class="px-4 py-8 text-center text-slate-400">
+                No withdrawal requests found.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </div>
+
+  <section class="rounded-2xl border border-slate-700 bg-slate-900 p-5">
+    <h2 class="text-lg font-bold mb-4">Admin Quick Links</h2>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      <a href="{{ url_for('admin_users') }}"
+         class="rounded-xl bg-slate-800 hover:bg-slate-700 p-4">
+        <p class="font-semibold">Manage Users</p>
+        <p class="text-sm text-slate-400 mt-1">View registered accounts</p>
+      </a>
+
+      <a href="{{ url_for('admin_withdrawals') }}"
+         class="rounded-xl bg-slate-800 hover:bg-slate-700 p-4">
+        <p class="font-semibold">Withdrawals</p>
+        <p class="text-sm text-slate-400 mt-1">Review pending requests</p>
+      </a>
+
+      <a href="{{ url_for('admin_transactions') }}"
+         class="rounded-xl bg-slate-800 hover:bg-slate-700 p-4">
+        <p class="font-semibold">Transactions</p>
+        <p class="text-sm text-slate-400 mt-1">Review account activity</p>
+      </a>
+
+      <a href="{{ url_for('admin_settings') }}"
+         class="rounded-xl bg-slate-800 hover:bg-slate-700 p-4">
+        <p class="font-semibold">Website Settings</p>
+        <p class="text-sm text-slate-400 mt-1">Manage available settings</p>
+      </a>
+
+      <a href="{{ url_for('admin_announcements') }}"
+         class="rounded-xl bg-slate-800 hover:bg-slate-700 p-4">
+        <p class="font-semibold">Announcements</p>
+        <p class="text-sm text-slate-400 mt-1">Manage site announcements</p>
+      </a>
+
+      <a href="{{ url_for('admin_support') }}"
+         class="rounded-xl bg-slate-800 hover:bg-slate-700 p-4">
+        <p class="font-semibold">Support</p>
+        <p class="text-sm text-slate-400 mt-1">View support section</p>
+      </a>
+
+      <a href="{{ url_for('admin_security') }}"
+         class="rounded-xl bg-slate-800 hover:bg-slate-700 p-4">
+        <p class="font-semibold">Security</p>
+        <p class="text-sm text-slate-400 mt-1">Review admin security</p>
+      </a>
+
+      <a href="{{ url_for('admin_reports') }}"
+         class="rounded-xl bg-slate-800 hover:bg-slate-700 p-4">
+        <p class="font-semibold">Reports</p>
+        <p class="text-sm text-slate-400 mt-1">View site reports</p>
+      </a>
+
+      <a href="{{ url_for('admin_login_history') }}"
+         class="rounded-xl bg-slate-800 hover:bg-slate-700 p-4">
+        <p class="font-semibold">Login History</p>
+        <p class="text-sm text-slate-400 mt-1">Review admin login records</p>
+      </a>
+    </div>
+  </section>
+
+</div>
+{% endblock %}
+              
