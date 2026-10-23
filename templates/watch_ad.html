@@ -16,7 +16,7 @@
     <h1 class="text-2xl font-bold mb-3">Watch Advertisement</h1>
 
     <p class="text-slate-400 mb-6">
-      Keep this page open while the countdown runs.
+      Tap the button below to open the advert. Keep this page open while the countdown runs.
     </p>
 
     <div id="timer"
@@ -25,18 +25,23 @@
     </div>
 
     <p id="status" class="text-slate-300 mb-5">
-      Opening advertisement and starting timer...
+      Tap the button to start watching.
     </p>
 
     <p id="error" class="hidden text-red-400 mb-5"></p>
 
-    <button id="retry"
-      class="hidden w-full rounded-xl bg-purple-600 py-4 font-bold text-white">
+    <button id="startBtn" type="button"
+      class="w-full rounded-xl bg-purple-600 py-4 font-bold text-white">
+      Open Advertisement
+    </button>
+
+    <button id="retry" type="button"
+      class="hidden w-full rounded-xl bg-slate-700 py-4 font-bold text-white mt-3">
       Try Again
     </button>
 
     <p class="text-xs text-slate-500 mt-6">
-      Reward: 3 Poly Points after a successful, verified claim.
+      Reward: 3 Poly Points after a successful claim.
     </p>
   </main>
 
@@ -46,6 +51,7 @@
     const timerEl = document.getElementById("timer");
     const statusEl = document.getElementById("status");
     const errorEl = document.getElementById("error");
+    const startBtn = document.getElementById("startBtn");
     const retryBtn = document.getElementById("retry");
 
     let started = false;
@@ -53,10 +59,14 @@
 
     function showError(message) {
       clearInterval(countdownInterval);
+      started = false;
+
       timerEl.textContent = "00:30";
       statusEl.textContent = "Could not start the reward session.";
       errorEl.textContent = message;
       errorEl.classList.remove("hidden");
+
+      startBtn.classList.remove("hidden");
       retryBtn.classList.remove("hidden");
     }
 
@@ -64,65 +74,82 @@
       if (started) return;
       started = true;
 
-      retryBtn.classList.add("hidden");
       errorEl.classList.add("hidden");
-      statusEl.textContent = "Opening advertisement...";
+      startBtn.disabled = true;
+      startBtn.classList.add("opacity-50");
+      retryBtn.classList.add("hidden");
+      statusEl.textContent = "Authorizing your reward session...";
 
-      // Request server authorization first.
-      // Open the ad immediately after authorization succeeds.
+      // Open the advert immediately during the button tap.
+      // This helps prevent mobile browsers from blocking the popup.
+      const adWindow = window.open(AD_URL, "_blank");
+
+      if (!adWindow) {
+        started = false;
+        startBtn.disabled = false;
+        startBtn.classList.remove("opacity-50");
+
+        showError("Your browser blocked the advert. Allow pop-ups, then tap Try Again.");
+        return;
+      }
+
       try {
         const response = await fetch("/start-ad", {
           method: "POST",
-          headers: { "Accept": "application/json" },
+          headers: {
+            "Accept": "application/json"
+          },
           credentials: "same-origin"
         });
 
         const data = await response.json();
 
         if (!response.ok || !data.ok) {
-          throw new Error(data.message || "Server could not authorize this session.");
-        }
+          try {
+            adWindow.close();
+          } catch (e) {}
 
-        // The user clicks Watch Ad to reach this page.
-        // Some mobile browsers may block a delayed new tab.
-        const adWindow = window.open(AD_URL, "_blank");
-
-        if (!adWindow) {
-          started = false;
-          showError("Your browser blocked the advert. Allow pop-ups and tap Try Again.");
-          return;
+          throw new Error(
+            data.message || "The server could not authorize this session."
+          );
         }
 
         let remaining = 30;
         timerEl.textContent = "00:30";
-        statusEl.textContent = "Advertisement opened. Please wait...";
+        statusEl.textContent =
+          "Advert opened. Keep this page open until the timer finishes.";
+
+        startBtn.classList.add("hidden");
 
         countdownInterval = setInterval(() => {
           remaining--;
-          timerEl.textContent = "00:" + String(remaining).padStart(2, "0");
+
+          timerEl.textContent =
+            "00:" + String(remaining).padStart(2, "0");
 
           if (remaining <= 0) {
             clearInterval(countdownInterval);
-            statusEl.textContent = "Time complete. Claiming your reward...";
+            statusEl.textContent = "Time complete. Submitting reward claim...";
 
             const form = document.createElement("form");
             form.method = "POST";
             form.action = "/claim-reward";
+
             document.body.appendChild(form);
             form.submit();
           }
         }, 1000);
 
       } catch (error) {
-        started = false;
         showError(error.message || "Unable to start. Please try again.");
+      } finally {
+        startBtn.disabled = false;
+        startBtn.classList.remove("opacity-50");
       }
     }
 
+    startBtn.addEventListener("click", startWatching);
     retryBtn.addEventListener("click", startWatching);
-
-    // Start automatically when the page loads.
-    startWatching();
   </script>
 
 </body>
