@@ -1286,5 +1286,73 @@ def logout():
     return redirect(url_for("login"))
 
 
+
+@app.route("/admin/users/<int:user_id>")
+def admin_user_detail(user_id):
+    guard = admin_page_guard()
+    if guard:
+        return guard
+
+    conn = get_db()
+    cursor = conn.cursor()
+    p = placeholder()
+
+    try:
+        cursor.execute(
+            f"""SELECT id, username, email, points, usd_balance,
+                       ads_watched_count, referral_code, referred_by, created_at
+                FROM users
+                WHERE id = {p}""",
+            (user_id,)
+        )
+        user = cursor.fetchone()
+
+        if not user:
+            flash("User account not found.", "error")
+            return redirect(url_for("admin_users"))
+
+        cursor.execute(
+            f"SELECT COUNT(*) FROM users WHERE referred_by = {p}",
+            (user_id,)
+        )
+        referral_count = cursor.fetchone()[0]
+
+        cursor.execute(
+            f"""SELECT type, points_change, usd_change, description, created_at
+                FROM transactions
+                WHERE user_id = {p}
+                ORDER BY id DESC LIMIT 50""",
+            (user_id,)
+        )
+        transactions = cursor.fetchall()
+
+        cursor.execute(
+            f"""SELECT id, amount_usd, status, wallet_address, token,
+                       network, created_at, processed_at
+                FROM withdrawals
+                WHERE user_id = {p}
+                ORDER BY id DESC""",
+            (user_id,)
+        )
+        withdrawals = cursor.fetchall()
+
+        return render_template(
+            "admin_user_detail.html",
+            user=user,
+            referral_count=referral_count,
+            transactions=transactions,
+            withdrawals=withdrawals
+        )
+
+    except Exception:
+        app.logger.exception("Could not load admin user details.")
+        flash("Could not load this user's details.", "error")
+        return redirect(url_for("admin_users"))
+
+    finally:
+        cursor.close()
+        conn.close()
+        
+
 # Initialize database tables when the application starts.
 init_db()
