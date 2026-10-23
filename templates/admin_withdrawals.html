@@ -1,0 +1,154 @@
+
+{% extends "admin_base.html" %}
+
+{% block title %}Withdrawal Management{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+  <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div>
+      <h1 class="text-2xl font-extrabold sm:text-3xl">Withdrawal Management</h1>
+      <p class="mt-2 text-sm text-slate-400">Review withdrawal requests and manage their status.</p>
+    </div>
+    <a href="{{ url_for('admin_dashboard') }}"
+       class="rounded-xl border border-slate-700 px-5 py-3 text-center hover:bg-slate-800">
+      ← Back to Dashboard
+    </a>
+  </div>
+
+  {% set ns = namespace(pending=0, approved=0, rejected=0) %}
+  {% for item in withdrawals %}
+    {% if item[4]|string|lower == 'pending' %}
+      {% set ns.pending = ns.pending + 1 %}
+    {% elif item[4]|string|lower == 'approved' %}
+      {% set ns.approved = ns.approved + 1 %}
+    {% elif item[4]|string|lower == 'rejected' %}
+      {% set ns.rejected = ns.rejected + 1 %}
+    {% endif %}
+  {% endfor %}
+
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+    <div class="rounded-2xl border border-amber-500/30 bg-slate-900 p-5">
+      <p class="text-sm text-slate-400">Pending</p>
+      <p class="mt-2 text-3xl font-extrabold text-amber-400">{{ ns.pending }}</p>
+    </div>
+    <div class="rounded-2xl border border-emerald-500/30 bg-slate-900 p-5">
+      <p class="text-sm text-slate-400">Approved</p>
+      <p class="mt-2 text-3xl font-extrabold text-emerald-400">{{ ns.approved }}</p>
+    </div>
+    <div class="rounded-2xl border border-red-500/30 bg-slate-900 p-5">
+      <p class="text-sm text-slate-400">Rejected</p>
+      <p class="mt-2 text-3xl font-extrabold text-red-400">{{ ns.rejected }}</p>
+    </div>
+  </div>
+
+  <section class="overflow-hidden rounded-2xl border border-slate-700 bg-slate-900">
+    <div class="border-b border-slate-700 p-5">
+      <h2 class="text-lg font-bold">All Withdrawal Requests</h2>
+      <p class="mt-1 text-sm text-slate-400">Check the wallet and network before processing payment.</p>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="w-full min-w-[850px] text-left text-sm">
+        <thead class="bg-slate-800 text-slate-400">
+          <tr>
+            <th class="px-4 py-4">ID</th>
+            <th class="px-4 py-4">User</th>
+            <th class="px-4 py-4">Points</th>
+            <th class="px-4 py-4">Amount</th>
+            <th class="px-4 py-4">Wallet Address</th>
+            <th class="px-4 py-4">Network</th>
+            <th class="px-4 py-4">Date</th>
+            <th class="px-4 py-4">Status</th>
+            <th class="px-4 py-4">Action</th>
+          </tr>
+        </thead>
+
+        <tbody class="divide-y divide-slate-800">
+          {% for item in withdrawals %}
+          <tr class="align-top hover:bg-slate-800/40">
+            <td class="px-4 py-4">#{{ item[0] }}</td>
+
+            <td class="px-4 py-4">
+              <p class="font-semibold">{{ item[1] }}</p>
+              <p class="mt-1 text-xs text-slate-500">{{ item[2] }}</p>
+            </td>
+
+            <td class="px-4 py-4">{{ item[3] }}</td>
+
+            <td class="px-4 py-4 font-bold text-emerald-400">
+              ${{ "%.2f"|format(item[6]|default(0)|float) }}
+            </td>
+
+            <td class="max-w-[220px] break-all px-4 py-4 text-slate-300">
+              {{ item[7]|default('Not provided', true) }}
+              {% if item[7] %}
+              <button type="button"
+                      onclick="navigator.clipboard.writeText({{ item[7]|tojson }}).then(()=>alert('Wallet address copied')).catch(()=>alert('Please copy the wallet address manually'))"
+                      class="mt-2 block text-xs text-emerald-400 underline">
+                Copy wallet address
+              </button>
+              {% endif %}
+            </td>
+
+            <td class="px-4 py-4">
+              {{ item[8]|default('USDT', true) }}<br>
+              <span class="text-xs text-slate-400">{{ item[9]|default('Not specified', true) }}</span>
+            </td>
+
+            <td class="whitespace-nowrap px-4 py-4 text-slate-400">{{ item[5] }}</td>
+
+            <td class="px-4 py-4">
+              {% if item[4]|string|lower == 'pending' %}
+                <span class="rounded-full bg-amber-500/10 px-3 py-1 text-xs font-bold text-amber-400">Pending</span>
+              {% elif item[4]|string|lower == 'approved' %}
+                <span class="rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-bold text-emerald-400">Approved</span>
+              {% elif item[4]|string|lower == 'rejected' %}
+                <span class="rounded-full bg-red-500/10 px-3 py-1 text-xs font-bold text-red-400">Rejected</span>
+              {% else %}
+                <span class="rounded-full bg-slate-700 px-3 py-1 text-xs">{{ item[4] }}</span>
+              {% endif %}
+            </td>
+
+            <td class="px-4 py-4">
+              {% if item[4]|string|lower == 'pending' %}
+              <div class="flex flex-col gap-2">
+                <form method="POST" action="{{ url_for('process_withdrawal', withdrawal_id=item[0]) }}"
+                      onsubmit="return confirm('Have you sent the USDT payment to this wallet? Only approve after payment is sent.');">
+                  <input type="hidden" name="action" value="approve">
+                  <button type="submit"
+                          class="w-full rounded-lg bg-emerald-500 px-3 py-2 font-bold text-slate-950 hover:bg-emerald-400">
+                    Approve
+                  </button>
+                </form>
+
+                <form method="POST" action="{{ url_for('process_withdrawal', withdrawal_id=item[0]) }}"
+                      onsubmit="return confirm('Reject this withdrawal request?');">
+                  <input type="hidden" name="action" value="reject">
+                  <button type="submit"
+                          class="w-full rounded-lg bg-red-500/10 px-3 py-2 font-bold text-red-400 hover:bg-red-500/20">
+                    Reject
+                  </button>
+                </form>
+              </div>
+              {% else %}
+                <span class="text-xs text-slate-500">Processed</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="9" class="px-4 py-12 text-center">
+              <p class="font-semibold text-slate-300">No withdrawal requests yet</p>
+              <p class="mt-2 text-sm text-slate-500">User withdrawal requests will appear here.</p>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+</div>
+{% endblock %}
