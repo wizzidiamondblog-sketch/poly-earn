@@ -1354,5 +1354,71 @@ def admin_user_detail(user_id):
         conn.close()
         
 
+@app.route("/change-password", methods=["GET", "POST"])
+def change_password():
+    if "user_id" not in session:
+        flash("Please log in before changing your password.", "error")
+        return redirect(url_for("login"))
+
+    if request.method == "POST":
+        current_password = request.form.get("current_password") or ""
+        new_password = request.form.get("new_password") or ""
+        confirm_password = request.form.get("confirm_password") or ""
+
+        if not current_password or not new_password or not confirm_password:
+            flash("Please fill in all password fields.", "error")
+            return redirect(url_for("change_password"))
+
+        if len(new_password) < 8:
+            flash("New password must be at least 8 characters.", "error")
+            return redirect(url_for("change_password"))
+
+        if new_password != confirm_password:
+            flash("The new passwords do not match.", "error")
+            return redirect(url_for("change_password"))
+
+        conn = get_db()
+        cursor = conn.cursor()
+        p = placeholder()
+
+        try:
+            cursor.execute(
+                f"SELECT password FROM users WHERE id = {p}",
+                (session["user_id"],)
+            )
+            user = cursor.fetchone()
+
+            if not user:
+                session.clear()
+                return redirect(url_for("login"))
+
+            if not check_password_hash(user[0], current_password):
+                flash("Your current password is incorrect.", "error")
+                return redirect(url_for("change_password"))
+
+            hashed_password = generate_password_hash(new_password)
+            cursor.execute(
+                f"UPDATE users SET password = {p} WHERE id = {p}",
+                (hashed_password, session["user_id"])
+            )
+            conn.commit()
+
+            flash("Password changed successfully.", "success")
+            return redirect(url_for("profile"))
+
+        except Exception:
+            conn.rollback()
+            app.logger.exception("Password change failed.")
+            flash("Could not change your password. Please try again.", "error")
+            return redirect(url_for("change_password"))
+
+        finally:
+            cursor.close()
+            conn.close()
+
+    return render_template("reset_password.html")
+
+
 # Initialize database tables when the application starts.
 init_db()
+
