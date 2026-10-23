@@ -1421,7 +1421,38 @@ def change_password():
 
     return render_template("change_password.html")
 
+BREVO_SMTP_SERVER = os.environ.get("BREVO_SMTP_SERVER", "smtp-relay.brevo.com")
+BREVO_SMTP_PORT = int(os.environ.get("BREVO_SMTP_PORT", "587"))
+BREVO_SMTP_LOGIN = os.environ.get("BREVO_SMTP_LOGIN", "")
+BREVO_SMTP_KEY = os.environ.get("BREVO_SMTP_KEY", "")
+MAIL_FROM = os.environ.get("MAIL_FROM", "")
+APP_BASE_URL = (os.environ.get("APP_BASE_URL") or "https://poly-earn.onrender.com").rstrip("/")
 
+password_reset_serializer = URLSafeTimedSerializer(
+    app.secret_key,
+    salt="poly-earn-password-reset"
+)
+def send_password_reset_email(email, token):
+    reset_link = f"{APP_BASE_URL}{url_for('reset_password', token=token)}"
+
+    message = EmailMessage()
+    message["Subject"] = "Reset your Poly Earn password"
+    message["From"] = MAIL_FROM
+    message["To"] = email
+    message.set_content(
+        "We received a request to reset your Poly Earn password.\n\n"
+        f"Open this link within 30 minutes to choose a new password:\n{reset_link}\n\n"
+        "If you did not request this, ignore this email."
+    )
+
+    context = ssl.create_default_context()
+    with smtplib.SMTP(BREVO_SMTP_SERVER, BREVO_SMTP_PORT, timeout=20) as server:
+        server.ehlo()
+        server.starttls(context=context)
+        server.ehlo()
+        server.login(BREVO_SMTP_LOGIN, BREVO_SMTP_KEY)
+        server.send_message(message)
+        
 # Initialize database tables when the application starts.
 init_db()
 
