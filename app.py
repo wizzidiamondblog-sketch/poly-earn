@@ -1473,7 +1473,7 @@ def forgot_password():
             )
             user = cursor.fetchone()
 
-            if user and MAIL_FROM and BREVO_SMTP_LOGIN and BREVO_SMTP_KEY:
+           if user and MAIL_FROM and BREVO_API_KEY: 
                 token = password_reset_serializer.dumps({
                     "user_id": user[0],
                     "password": user[1]
