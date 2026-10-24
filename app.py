@@ -4,6 +4,7 @@ import sqlite3
 import logging
 import secrets
 import psycopg2
+import requests
 import smtplib
 import ssl
 from email.message import EmailMessage
@@ -1421,6 +1422,7 @@ def change_password():
 
     return render_template("change_password.html")
 
+BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "").strip()
 BREVO_SMTP_SERVER = os.environ.get("BREVO_SMTP_SERVER", "smtp-relay.brevo.com")
 BREVO_SMTP_PORT = int(os.environ.get("BREVO_SMTP_PORT", "587"))
 BREVO_SMTP_LOGIN = os.environ.get("BREVO_SMTP_LOGIN", "")
@@ -1484,10 +1486,23 @@ def forgot_password():
                 f"SELECT id, password FROM users WHERE LOWER(email) = {p}",
                 (email,)
             )
+            
             user = cursor.fetchone()
 
-           if user and MAIL_FROM and BREVO_API_KEY: 
+            if user and MAIL_FROM and BREVO_API_KEY:
                 token = password_reset_serializer.dumps({
+                    "user_id": user[0],
+                    "password": user[1]
+                })
+
+                try:
+                    send_password_reset_email(email, token)
+                except Exception:
+                    app.logger.exception("Could not send password reset email.")
+
+            elif user:
+                app.logger.error("Password reset email settings are missing.")
+
                     "user_id": user[0],
                     "password": user[1]
                 })
