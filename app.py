@@ -1432,26 +1432,39 @@ password_reset_serializer = URLSafeTimedSerializer(
     app.secret_key,
     salt="poly-earn-password-reset"
 )
+
 def send_password_reset_email(email, token):
     reset_link = f"{APP_BASE_URL}{url_for('reset_password', token=token)}"
 
-    message = EmailMessage()
-    message["Subject"] = "Reset your Poly Earn password"
-    message["From"] = MAIL_FROM
-    message["To"] = email
-    message.set_content(
-        "We received a request to reset your Poly Earn password.\n\n"
-        f"Open this link within 30 minutes to choose a new password:\n{reset_link}\n\n"
-        "If you did not request this, ignore this email."
+    payload = {
+        "sender": {
+            "name": "Poly Earn",
+            "email": MAIL_FROM
+        },
+        "to": [{"email": email}],
+        "subject": "Reset your Poly Earn password",
+        "textContent": (
+            "We received a request to reset your Poly Earn password.\n\n"
+            "Open this link within 30 minutes to choose a new password:\n"
+            f"{reset_link}\n\n"
+            "If you did not request this, ignore this email."
+        )
+    }
+
+    response = requests.post(
+        "https://api.brevo.com/v3/smtp/email",
+        headers={
+            "accept": "application/json",
+            "api-key": BREVO_API_KEY,
+            "content-type": "application/json"
+        },
+        json=payload,
+        timeout=20
     )
 
-    context = ssl.create_default_context()
-    with smtplib.SMTP(BREVO_SMTP_SERVER, BREVO_SMTP_PORT, timeout=20) as server:
-        server.ehlo()
-        server.starttls(context=context)
-        server.ehlo()
-        server.login(BREVO_SMTP_LOGIN, BREVO_SMTP_KEY)
-        server.send_message(message)
+    response.raise_for_status()
+
+
 
 @app.route("/forgot-password", methods=["GET", "POST"])
 def forgot_password():
