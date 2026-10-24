@@ -1468,6 +1468,7 @@ def send_password_reset_email(email, token):
 
 
 
+
 @app.route("/forgot-password", methods=["GET", "POST"])
 def forgot_password():
     if request.method == "POST":
@@ -1486,7 +1487,6 @@ def forgot_password():
                 f"SELECT id, password FROM users WHERE LOWER(email) = {p}",
                 (email,)
             )
-            
             user = cursor.fetchone()
 
             if user and MAIL_FROM and BREVO_API_KEY:
@@ -1498,22 +1498,14 @@ def forgot_password():
                 try:
                     send_password_reset_email(email, token)
                 except Exception:
-                    app.logger.exception("Could not send password reset email.")
+                    app.logger.exception(
+                        "Could not send password reset email."
+                    )
 
             elif user:
-                app.logger.error("Password reset email settings are missing.")
-
-                    "user_id": user[0],
-                    "password": user[1]
-                })
-
-                try:
-                    send_password_reset_email(email, token)
-                except Exception:
-                    app.logger.exception("Could not send password reset email.")
-
-            elif user:
-                app.logger.error("Password reset email settings are missing.")
+                app.logger.error(
+                    "Password reset email settings are missing."
+                )
 
         except Exception:
             app.logger.exception("Forgot-password request failed.")
@@ -1528,6 +1520,7 @@ def forgot_password():
         return redirect(url_for("forgot_password"))
 
     return render_template("forgot_password.html")
+
 
 @app.route("/reset-password/<token>", methods=["GET", "POST"])
 def reset_password(token):
